@@ -1,621 +1,219 @@
-"""DS-HDP-HMM sampler supporting hybrid continuous/categorical emissions."""
+"""Emission models for hybrid continuous / categorical observations."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
-from numpy.random import beta, binomial, dirichlet, gamma, multinomial
-
-from .emissions import HybridEmissionModel, HybridStateStatistics
+import scipy.special as ssp
 
 
-def transform_var_poly(v0: float, v1: float, p: float) -> Tuple[float, float]:
-    """Map auxiliary variables to Beta prior parameters."""
+ArrayLike = Sequence[float]
 
-    if p == float("inf") or p == "inf":
-        rho0 = -v0 * np.log(v1)
-    else:
-        rho0 = v0 / np.power(v1, float(p))
-    rho1 = (1.0 - v0) * rho0 / v0
-    return float(rho0), float(rho1)
+
+def _ensure_array(name: str, value: Optional[np.ndarray]) -> np.ndarray:
+    if value is None:
+        raise ValueError(f"{name} must be provided for the Gaussian prior")
+    return np.asarray(value, dtype=float)
 
 
 @dataclass
-class HybridObservations:
-    """Container for hybrid observation sequences."""
+class GaussianNIWPrior:
+    """Normal-Inverse-Wishart prior hyper-parameters."""
 
-    continuous: Optional[np.ndarray]
-    categorical: Optional[Sequence[np.ndarray]]
+    mu0: np.ndarray
+    kappa0: float
+    nu0: float
+    psi0: np.ndarray
 
-    def __post_init__(self) -> None:
-        if self.continuous is None and not self.categorical:
-            raise ValueError("At least one observation modality must be provided")
-        lengths: List[int] = []
-        if self.continuous is not None:
-            self.continuous = np.asarray(self.continuous, dtype=float)
-            if self.continuous.ndim == 1:
-                self.continuous = self.continuous[:, None]
-            lengths.append(int(self.continuous.shape[0]))
-        if self.categorical:
-            processed: List[np.ndarray] = []
-            for arr in self.categorical:
-                cat_arr = np.asarray(arr, dtype=int)
-                lengths.append(int(len(cat_arr)))
-                processed.append(cat_arr)
-            self.categorical = processed
-        if len(set(lengths)) != 1:
-            raise ValueError("Continuous and categorical observations must share the same length")
-        self.length = lengths[0]
-
-    def get(self, index: int) -> Tuple[Optional[np.ndarray], Optional[List[int]]]:
-        cont = None if self.continuous is None else self.continuous[index]
-        cats = None
-        if self.categorical:
-            cats = [int(arr[index]) for arr in self.categorical]
-        return cont, cats
+    @classmethod
+    def from_parameters(
+        cls,
+        mu0: ArrayLike,
+        kappa0: float,
+        nu0: float,
+        psi0: ArrayLike,
+    ) -> "GaussianNIWPrior":
+        mu0_arr = _ensure_array("mu0", np.asarray(mu0, dtype=float))
+        psi0_arr = _ensure_array("psi0", np.asarray(psi0, dtype=float))
+        if psi0_arr.shape[0] != psi0_arr.shape[1]:
+            raise ValueError("psi0 must be a square matrix")
+        if mu0_arr.shape[0] != psi0_arr.shape[0]:
+            raise ValueError("mu0 and psi0 must have matching dimensionality")
+        if nu0 <= mu0_arr.shape[0] - 1:
+            raise ValueError(
+                "nu0 must be greater than the dimensionality minus one for a valid NIW prior"
+            )
+        return cls(mu0=mu0_arr, kappa0=float(kappa0), nu0=float(nu0), psi0=psi0_arr)
 
 
-class DSHDPHMMHybridSampler:
-    """Direct-assignment Gibbs sampler for hybrid-emission DS-HDP-HMM."""
+class HybridStateStatistics:
+    """Sufficient statistics for a single hidden state."""
+
+    def __init__(self, emission_model: "HybridEmissionModel") -> None:
+        self._model = emission_model
+        self.count: int = 0
+        if emission_model.has_continuous:
+            d = emission_model.continuous_dim
+            self.sum_cont = np.zeros(d, dtype=float)
+            self.sum_outer = np.zeros((d, d), dtype=float)
+        else:
+            self.sum_cont = np.array([], dtype=float)
+            self.sum_outer = np.zeros((0, 0), dtype=float)
+        self.cat_counts: List[np.ndarray] = [
+            np.zeros_like(prior, dtype=float) for prior in emission_model.categorical_priors
+        ]
+
+    def add_observation(
+        self, observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]]
+    ) -> None:
+        cont, cats = observation
+        if cont is not None:
+            cont = np.asarray(cont, dtype=float)
+            self.sum_cont += cont
+            self.sum_outer += np.outer(cont, cont)
+        if cats is not None:
+            for idx, cat in enumerate(cats):
+                self.cat_counts[idx][cat] += 1.0
+        self.count += 1
+
+    def remove_observation(
+        self, observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]]
+    ) -> None:
+        cont, cats = observation
+        if cont is not None:
+            cont = np.asarray(cont, dtype=float)
+            self.sum_cont -= cont
+            self.sum_outer -= np.outer(cont, cont)
+        if cats is not None:
+            for idx, cat in enumerate(cats):
+                self.cat_counts[idx][cat] -= 1.0
+        self.count -= 1
+
+    def predictive_log_prob(
+        self,
+        observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+    ) -> float:
+        return self._model.predictive_log_prob(self, observation)
+
+
+class HybridEmissionModel:
+    """Hybrid emission model with Gaussian and categorical components."""
 
     def __init__(
         self,
-        observations: HybridObservations,
-        emission_model: HybridEmissionModel,
-        alpha0: float,
-        gamma0: float,
-        rho0: float,
-        rho1: float,
+        gaussian_prior: Optional[GaussianNIWPrior] = None,
+        categorical_priors: Optional[Iterable[ArrayLike]] = None,
     ) -> None:
-        self.obs = observations
-        self.model = emission_model
-        self.alpha0 = float(alpha0)
-        self.gamma0 = float(gamma0)
-        self.rho0 = float(rho0)
-        self.rho1 = float(rho1)
-        self.reset_state()
+        self.gaussian_prior = gaussian_prior
+        self.categorical_priors: List[np.ndarray] = [
+            np.asarray(prior, dtype=float) for prior in (categorical_priors or [])
+        ]
+        for prior in self.categorical_priors:
+            if prior.ndim != 1:
+                raise ValueError("Categorical priors must be one-dimensional vectors")
+            if np.any(prior <= 0):
+                raise ValueError("Categorical priors must have strictly positive entries")
 
-    def reset_state(self) -> None:
-        self.K = 0
-        self.zt = np.zeros(self.obs.length, dtype=int)
-        self.wt = np.zeros(self.obs.length, dtype=int)
-        self.beta_vec = np.array([], dtype=float)
-        self.beta_new = 1.0
-        self.kappa_vec = np.array([], dtype=float)
-        self.kappa_new = 0.5
-        self.n_mat = np.zeros((0, 0), dtype=float)
-        self.states: List[HybridStateStatistics] = []
+    @property
+    def has_continuous(self) -> bool:
+        return self.gaussian_prior is not None
 
-    def initialize(self) -> None:
-        self.reset_state()
-        T = self.obs.length
-        self.K = 1
-        self.zt = np.zeros(T, dtype=int)
-        beta_draw = dirichlet(np.array([1.0, self.gamma0]))
-        self.beta_vec = np.array([beta_draw[0]])
-        self.beta_new = float(beta_draw[1])
-        kappa_init = beta(self.rho0, self.rho1, size=1)[0]
-        self.kappa_vec = np.array([kappa_init])
-        self.kappa_new = beta(self.rho0, self.rho1, size=1)[0]
-        self.kappa_vec = np.clip(self.kappa_vec, 0.0, 0.8)
-        self.wt = binomial(1, self.kappa_vec[0], size=T)
-        self.wt[0] = 0
-        self.n_mat = np.array([[0.0]])
-        self.states = [self.model.create_state()]
-        self.states[0].add_observation(self.obs.get(0))
-        (
-            self.zt,
-            self.wt,
-            self.n_mat,
-            self.states,
-            self.beta_vec,
-            self.beta_new,
-            self.kappa_vec,
-            self.kappa_new,
-            self.K,
-        ) = sample_one_step_ahead(
-            self.obs,
-            self.model,
-            self.zt,
-            self.wt,
-            self.n_mat,
-            self.states,
-            self.beta_vec,
-            self.beta_new,
-            self.kappa_vec,
-            self.kappa_new,
-            self.alpha0,
-            self.gamma0,
-            self.rho0,
-            self.rho1,
-            self.K,
-        )
+    @property
+    def continuous_dim(self) -> int:
+        if self.gaussian_prior is None:
+            return 0
+        return int(self.gaussian_prior.mu0.shape[0])
 
-    def step(
+    def create_state(self) -> HybridStateStatistics:
+        return HybridStateStatistics(self)
+
+    def predictive_log_prob(
         self,
-        resample_hyperparams: bool = False,
-        alpha_prior: Optional[Tuple[float, float]] = None,
-        gamma_prior: Optional[Tuple[float, float]] = None,
-        rho_grid: Optional[Dict[str, float]] = None,
-    ) -> None:
-        (
-            self.zt,
-            self.wt,
-            self.n_mat,
-            self.states,
-            self.beta_vec,
-            self.beta_new,
-            self.kappa_vec,
-            self.kappa_new,
-            self.K,
-        ) = sample_zw(
-            self.obs,
-            self.model,
-            self.zt,
-            self.wt,
-            self.n_mat,
-            self.states,
-            self.beta_vec,
-            self.beta_new,
-            self.kappa_vec,
-            self.kappa_new,
-            self.alpha0,
-            self.gamma0,
-            self.rho0,
-            self.rho1,
-            self.K,
+        state: HybridStateStatistics,
+        observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+    ) -> float:
+        cont, cats = observation
+        log_prob = 0.0
+        if self.has_continuous:
+            if cont is None:
+                raise ValueError("Continuous observation expected but not provided")
+            log_prob += self._gaussian_log_predictive(state, np.asarray(cont, dtype=float))
+        if self.categorical_priors and cats is None:
+            raise ValueError("Categorical observation expected but not provided")
+        if self.categorical_priors:
+            log_prob += self._categorical_log_predictive(state, cats)
+        return float(log_prob)
+
+    def predictive_log_prob_new(
+        self, observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]]
+    ) -> float:
+        temp_state = self.create_state()
+        return self.predictive_log_prob(temp_state, observation)
+
+    def _gaussian_log_predictive(
+        self, state: HybridStateStatistics, cont: np.ndarray
+    ) -> float:
+        prior = self.gaussian_prior
+        if prior is None:
+            raise ValueError("Gaussian prior not configured")
+        d = self.continuous_dim
+        n = state.count
+        if n < 0:
+            raise ValueError("State count became negative; check sampler bookkeeping")
+        kappa_n = prior.kappa0 + n
+        nu_n = prior.nu0 + n
+        mu_n = (prior.kappa0 * prior.mu0 + state.sum_cont) / kappa_n
+        lambda_n = (
+            prior.psi0
+            + state.sum_outer
+            + prior.kappa0 * np.outer(prior.mu0, prior.mu0)
+            - kappa_n * np.outer(mu_n, mu_n)
         )
-        (
-            self.zt,
-            self.n_mat,
-            self.states,
-            self.beta_vec,
-            self.K,
-        ) = decre_K(self.zt, self.n_mat, self.states, self.beta_vec)
-        self.kappa_vec, self.kappa_new, num_1_vec, num_0_vec = sample_kappa(
-            self.zt, self.wt, self.rho0, self.rho1, self.K
-        )
-        m_mat = sample_m(self.n_mat, self.beta_vec, self.alpha0, self.K)
-        self.beta_vec, self.beta_new = sample_beta(m_mat, self.gamma0)
-        if resample_hyperparams:
-            if alpha_prior is None or gamma_prior is None or rho_grid is None:
-                raise ValueError("Hyper-parameter priors must be provided for resampling")
-            self.alpha0 = sample_alpha(
-                m_mat, self.n_mat, self.alpha0, alpha_prior[0], alpha_prior[1]
-            )
-            self.gamma0 = sample_gamma(self.K, m_mat, self.gamma0, gamma_prior[0], gamma_prior[1])
-            self.rho0, self.rho1, _ = sample_rho(
-                rho_grid["v0_range"],
-                rho_grid["v1_range"],
-                int(rho_grid["v0_num_grid"]),
-                int(rho_grid["v1_num_grid"]),
-                self.K,
-                num_1_vec,
-                num_0_vec,
-                rho_grid["p"],
-            )
+        df = nu_n - d + 1
+        if df <= 0:
+            raise ValueError("Degrees of freedom for predictive Student-t must be positive")
+        scale = (kappa_n + 1) / (kappa_n * df) * lambda_n
+        return _multivariate_student_t_logpdf(cont, mu_n, scale, df)
 
-    def run(
-        self,
-        num_iterations: int,
-        burn_in: int = 0,
-        resample_hyperparams: bool = False,
-        alpha_prior: Optional[Tuple[float, float]] = None,
-        gamma_prior: Optional[Tuple[float, float]] = None,
-        rho_grid: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, List[np.ndarray]]:
-        if self.K == 0:
-            self.initialize()
-        history: Dict[str, List[np.ndarray]] = {"zt": [], "wt": []}
-        for it in range(num_iterations):
-            self.step(
-                resample_hyperparams=resample_hyperparams,
-                alpha_prior=alpha_prior,
-                gamma_prior=gamma_prior,
-                rho_grid=rho_grid,
-            )
-            if it >= burn_in:
-                history["zt"].append(self.zt.copy())
-                history["wt"].append(self.wt.copy())
-        return history
+    def _categorical_log_predictive(
+        self, state: HybridStateStatistics, cats: Sequence[int]
+    ) -> float:
+        if len(cats) != len(self.categorical_priors):
+            raise ValueError("Categorical observation dimensionality mismatch")
+        log_prob = 0.0
+        for idx, prior in enumerate(self.categorical_priors):
+            counts = state.cat_counts[idx]
+            total = counts.sum()
+            numerator = counts[cats[idx]] + prior[cats[idx]]
+            denominator = total + prior.sum()
+            log_prob += np.log(numerator / denominator)
+        return log_prob
 
 
-def sample_one_step_ahead(
-    obs: HybridObservations,
-    model: HybridEmissionModel,
-    zt: np.ndarray,
-    wt: np.ndarray,
-    n_mat: np.ndarray,
-    states: List[HybridStateStatistics],
-    beta_vec: np.ndarray,
-    beta_new: float,
-    kappa_vec: np.ndarray,
-    kappa_new: float,
-    alpha0: float,
-    gamma0: float,
-    rho0: float,
-    rho1: float,
-    K: int,
-) -> Tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    List[HybridStateStatistics],
-    np.ndarray,
-    float,
-    np.ndarray,
-    float,
-    int,
-]:
-    T = len(zt)
-    for t in range(1, T):
-        j = zt[t - 1]
-        observation = obs.get(t)
-        zt_dist = (alpha0 * beta_vec + n_mat[j]) / (alpha0 + n_mat[j].sum())
-        yt_dist = np.array(
-            [np.exp(state.predictive_log_prob(observation)) for state in states]
-        )
-        knew_dist = alpha0 * beta_new / (alpha0 + n_mat[j].sum())
-        yt_knew = np.exp(model.predictive_log_prob_new(observation))
-        post_cases = np.hstack(
-            (
-                kappa_vec[j] * yt_dist[j],
-                (1 - kappa_vec[j]) * zt_dist * yt_dist,
-                (1 - kappa_vec[j]) * knew_dist * yt_knew,
-            )
-        )
-        post_cases = post_cases / post_cases.sum()
-        sample_rlt = np.where(multinomial(1, post_cases))[0][0]
-        if sample_rlt < 1:
-            zt[t], wt[t] = j, 1
-        else:
-            zt[t], wt[t] = sample_rlt - 1, 0
-        if zt[t] == K:
-            b = beta(1.0, gamma0, size=1)[0]
-            beta_vec = np.hstack((beta_vec, b * beta_new))
-            kappa_vec = np.hstack((kappa_vec, kappa_new))
-            beta_new = (1 - b) * beta_new
-            kappa_new = beta(rho0, rho1, size=1)[0]
-            kappa_vec[-1] = np.clip(kappa_vec[-1], 0.0, 0.8)
-            states.append(model.create_state())
-            n_mat = np.hstack((n_mat, np.zeros((K, 1))))
-            n_mat = np.vstack((n_mat, np.zeros((1, K + 1))))
-            K += 1
-        if wt[t] == 0:
-            n_mat[j, zt[t]] += 1
-        states[zt[t]].add_observation(observation)
-    return zt, wt, n_mat, states, beta_vec, beta_new, kappa_vec, kappa_new, K
-
-
-def sample_last(
-    obs: HybridObservations,
-    model: HybridEmissionModel,
-    zt: np.ndarray,
-    wt: np.ndarray,
-    n_mat: np.ndarray,
-    states: List[HybridStateStatistics],
-    beta_vec: np.ndarray,
-    beta_new: float,
-    kappa_vec: np.ndarray,
-    kappa_new: float,
-    alpha0: float,
-    gamma0: float,
-    rho0: float,
-    rho1: float,
-    K: int,
-) -> Tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    List[HybridStateStatistics],
-    np.ndarray,
-    float,
-    np.ndarray,
-    float,
-    int,
-]:
-    t = len(zt) - 1
-    j = zt[t - 1]
-    observation = obs.get(t)
-    if wt[t] == 0:
-        n_mat[j, zt[t]] -= 1
-    states[zt[t]].remove_observation(observation)
-    zt_dist = (alpha0 * beta_vec + n_mat[j]) / (alpha0 + n_mat[j].sum())
-    yt_dist = np.array(
-        [np.exp(state.predictive_log_prob(observation)) for state in states]
-    )
-    knew_dist = alpha0 * beta_new / (alpha0 + n_mat[j].sum())
-    yt_knew = np.exp(model.predictive_log_prob_new(observation))
-    post_cases = np.hstack(
-        (
-            kappa_vec[j] * yt_dist[j],
-            (1 - kappa_vec[j]) * zt_dist * yt_dist,
-            (1 - kappa_vec[j]) * knew_dist * yt_knew,
-        )
-    )
-    post_cases = post_cases / post_cases.sum()
-    sample_rlt = np.where(multinomial(1, post_cases))[0][0]
-    if sample_rlt < 1:
-        zt[t], wt[t] = j, 1
-    else:
-        zt[t], wt[t] = sample_rlt - 1, 0
-    if zt[t] == K:
-        b = beta(1.0, gamma0, size=1)[0]
-        beta_vec = np.hstack((beta_vec, b * beta_new))
-        kappa_vec = np.hstack((kappa_vec, kappa_new))
-        beta_new = (1 - b) * beta_new
-        kappa_new = beta(rho0, rho1, size=1)[0]
-        kappa_vec[-1] = np.clip(kappa_vec[-1], 0.0, 0.8)
-        states.append(model.create_state())
-        n_mat = np.hstack((n_mat, np.zeros((K, 1))))
-        n_mat = np.vstack((n_mat, np.zeros((1, K + 1))))
-        K += 1
-    if wt[t] == 0:
-        n_mat[j, zt[t]] += 1
-    states[zt[t]].add_observation(observation)
-    return zt, wt, n_mat, states, beta_vec, beta_new, kappa_vec, kappa_new, K
-
-
-def sample_zw(
-    obs: HybridObservations,
-    model: HybridEmissionModel,
-    zt: np.ndarray,
-    wt: np.ndarray,
-    n_mat: np.ndarray,
-    states: List[HybridStateStatistics],
-    beta_vec: np.ndarray,
-    beta_new: float,
-    kappa_vec: np.ndarray,
-    kappa_new: float,
-    alpha0: float,
-    gamma0: float,
-    rho0: float,
-    rho1: float,
-    K: int,
-) -> Tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-    List[HybridStateStatistics],
-    np.ndarray,
-    float,
-    np.ndarray,
-    float,
-    int,
-]:
-    T = len(zt)
-    tmp_vec = np.arange(K)
-    for t in range(1, T - 1):
-        j = zt[t - 1]
-        l = zt[t + 1]
-        observation = obs.get(t)
-        if wt[t] == 0:
-            n_mat[j, zt[t]] -= 1
-        if wt[t + 1] == 0:
-            n_mat[zt[t], l] -= 1
-        states[zt[t]].remove_observation(observation)
-        zt_dist = (alpha0 * beta_vec + n_mat[j]) / (alpha0 + n_mat[j].sum())
-        ztplus1_dist = (
-            alpha0 * beta_vec[l]
-            + n_mat[:, l]
-            + (j == l) * (j == tmp_vec)
-        ) / (alpha0 + n_mat.sum(axis=1) + (j == tmp_vec))
-        yt_dist = np.array(
-            [np.exp(state.predictive_log_prob(observation)) for state in states]
-        )
-        knew_dist = (alpha0**2) * beta_vec[l] * beta_new / (
-            alpha0 * (alpha0 + n_mat[j].sum())
-        )
-        yt_knew = np.exp(model.predictive_log_prob_new(observation))
-        post_cases = np.array(
-            (
-                (kappa_vec[j] ** 2) * yt_dist[j] * (j == l),
-                (1 - kappa_vec[j]) * kappa_vec[l] * zt_dist[l] * yt_dist[l],
-                kappa_vec[j] * (1 - kappa_vec[j]) * ztplus1_dist[j] * yt_dist[j],
-            )
-        )
-        post_cases = np.hstack(
-            (
-                post_cases,
-                (1 - kappa_vec[j])
-                * (1 - kappa_vec)
-                * zt_dist
-                * ztplus1_dist
-                * yt_dist,
-                (1 - kappa_vec[j]) * (1 - kappa_new) * knew_dist * yt_knew,
-            )
-        )
-        post_cases = post_cases / post_cases.sum()
-        sample_rlt = np.where(multinomial(1, post_cases))[0][0]
-        if sample_rlt < 3:
-            choices = [[j, 1, 1], [l, 0, 1], [j, 1, 0]]
-            zt[t], wt[t], wt[t + 1] = choices[sample_rlt]
-        else:
-            zt[t], wt[t], wt[t + 1] = sample_rlt - 3, 0, 0
-        if zt[t] == K:
-            b = beta(1.0, gamma0, size=1)[0]
-            beta_vec = np.hstack((beta_vec, b * beta_new))
-            kappa_vec = np.hstack((kappa_vec, kappa_new))
-            beta_new = (1 - b) * beta_new
-            kappa_new = beta(rho0, rho1, size=1)[0]
-            kappa_vec[-1] = np.clip(kappa_vec[-1], 0.0, 0.8)
-            states.append(model.create_state())
-            n_mat = np.hstack((n_mat, np.zeros((K, 1))))
-            n_mat = np.vstack((n_mat, np.zeros((1, K + 1))))
-            tmp_vec = np.arange(K + 1)
-            K += 1
-        if wt[t] == 0:
-            n_mat[j, zt[t]] += 1
-        if wt[t + 1] == 0:
-            n_mat[zt[t], l] += 1
-        states[zt[t]].add_observation(observation)
-    return sample_last(
-        obs,
-        model,
-        zt,
-        wt,
-        n_mat,
-        states,
-        beta_vec,
-        beta_new,
-        kappa_vec,
-        kappa_new,
-        alpha0,
-        gamma0,
-        rho0,
-        rho1,
-        K,
-    )
-
-
-def decre_K(
-    zt: np.ndarray,
-    n_mat: np.ndarray,
-    states: List[HybridStateStatistics],
-    beta_vec: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray, List[HybridStateStatistics], np.ndarray, int]:
-    rem_ind = np.unique(zt)
-    mapping = {old: new for new, old in enumerate(sorted(rem_ind))}
-    zt = np.array([mapping[x] for x in zt])
-    n_mat = n_mat[rem_ind][:, rem_ind]
-    beta_vec = beta_vec[rem_ind]
-    states = [states[idx] for idx in rem_ind]
-    return zt, n_mat, states, beta_vec, len(rem_ind)
-
-
-def sample_kappa(
-    zt: np.ndarray,
-    wt: np.ndarray,
-    rho0: float,
-    rho1: float,
-    K: int,
-) -> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
-    kappa_vec = np.zeros(K)
-    num_1_vec = np.zeros(K)
-    num_0_vec = np.zeros(K)
-    for j in range(K):
-        ind_lists = np.where(zt[:-1] == j)[0] + 1
-        num_1 = wt[ind_lists].sum()
-        num_0 = len(ind_lists) - num_1
-        num_1_vec[j] = num_1
-        num_0_vec[j] = num_0
-        kappa_vec[j] = beta(rho0 + num_1, rho1 + num_0, size=1)[0]
-    kappa_new = beta(rho0, rho1, size=1)[0]
-    return kappa_vec, kappa_new, num_1_vec, num_0_vec
-
-
-def sample_m(n_mat: np.ndarray, beta_vec: np.ndarray, alpha0: float, K: int) -> np.ndarray:
-    m_mat = np.zeros((K, K))
-    for j in range(K):
-        for k in range(K):
-            if n_mat[j, k] == 0:
-                continue
-            probs = alpha0 * beta_vec[k] / (np.arange(n_mat[j, k]) + alpha0 * beta_vec[k])
-            draws = binomial(1, probs)
-            m_mat[j, k] = draws.sum()
-    m_mat[0, 0] += 1
-    return m_mat
-
-
-def sample_beta(m_mat: np.ndarray, gamma0: float) -> Tuple[np.ndarray, float]:
-    beta_full = dirichlet(np.hstack((m_mat.sum(axis=0), gamma0)))
-    return beta_full[:-1], float(beta_full[-1])
-
-
-def sample_alpha(
-    m_mat: np.ndarray,
-    n_mat: np.ndarray,
-    alpha0: float,
-    alpha0_a_pri: float,
-    alpha0_b_pri: float,
+def _multivariate_student_t_logpdf(
+    x: np.ndarray, mu: np.ndarray, sigma: np.ndarray, df: float
 ) -> float:
-    r_vec = []
-    tmp = n_mat.sum(axis=1)
-    for val in tmp:
-        if val > 0:
-            r_vec.append(beta(alpha0 + 1, val))
-    r_vec = np.array(r_vec)
-    s_vec = binomial(1, n_mat.sum(axis=1) / (n_mat.sum(axis=1) + alpha0))
-    alpha0 = gamma(
-        alpha0_a_pri + m_mat.sum() - 1 - sum(s_vec),
-        1 / (alpha0_b_pri - sum(np.log(r_vec + 1e-6))),
+    x = np.asarray(x, dtype=float)
+    mu = np.asarray(mu, dtype=float)
+    sigma = np.asarray(sigma, dtype=float)
+    d = x.shape[0]
+    diff = x - mu
+    sign, logdet = np.linalg.slogdet(sigma)
+    if sign <= 0:
+        raise np.linalg.LinAlgError("Predictive scale matrix is not positive definite")
+    quad = diff.T @ np.linalg.solve(sigma, diff)
+    log_norm = (
+        ssp.gammaln((df + d) / 2.0)
+        - ssp.gammaln(df / 2.0)
+        - 0.5 * (d * np.log(df * np.pi) + logdet)
     )
-    return float(alpha0)
-
-
-def sample_gamma(
-    K: int,
-    m_mat: np.ndarray,
-    gamma0: float,
-    gamma0_a_pri: float,
-    gamma0_b_pri: float,
-) -> float:
-    eta = beta(gamma0 + 1, m_mat.sum())
-    pi_m = (gamma0_a_pri + K - 1) / (
-        gamma0_a_pri + K - 1 + m_mat.sum() * (gamma0_b_pri - np.log(eta + 1e-6))
-    )
-    indicator = binomial(1, pi_m)
-    if indicator:
-        gamma0 = gamma(
-            gamma0_a_pri + K,
-            1 / (gamma0_b_pri - np.log(eta + 1e-6)),
-        )
-    else:
-        gamma0 = gamma(
-            gamma0_a_pri + K - 1,
-            1 / (gamma0_b_pri - np.log(eta + 1e-6)),
-        )
-    return float(gamma0)
-
-
-def compute_rho_posterior(
-    rho0: float,
-    rho1: float,
-    K: int,
-    num_1_vec: np.ndarray,
-    num_0_vec: np.ndarray,
-) -> float:
-    import scipy.special as ssp
-
-    log_posterior = (
-        K * (ssp.gammaln(rho0 + rho1) - ssp.gammaln(rho0) - ssp.gammaln(rho1))
-        + np.sum(ssp.gammaln(rho0 + num_1_vec))
-        + np.sum(ssp.gammaln(rho1 + num_0_vec))
-        - np.sum(ssp.gammaln(rho0 + rho1 + num_1_vec + num_0_vec))
-    )
-    return float(np.real(log_posterior))
-
-
-def sample_rho(
-    v0_range: Tuple[float, float],
-    v1_range: Tuple[float, float],
-    v0_num_grid: int,
-    v1_num_grid: int,
-    K: int,
-    num_1_vec: np.ndarray,
-    num_0_vec: np.ndarray,
-    p: float,
-) -> Tuple[float, float, np.ndarray]:
-    v0_grid = np.linspace(v0_range[0], v0_range[1], v0_num_grid)
-    v1_grid = np.linspace(v1_range[0], v1_range[1], v1_num_grid)
-    posterior_grid = np.zeros((v0_num_grid, v1_num_grid))
-    for ii, v0 in enumerate(v0_grid):
-        for jj, v1 in enumerate(v1_grid):
-            rho0, rho1 = transform_var_poly(v0, v1, p)
-            posterior_grid[ii, jj] = compute_rho_posterior(rho0, rho1, K, num_1_vec, num_0_vec)
-    posterior_grid = np.exp(posterior_grid - posterior_grid.max())
-    posterior_grid /= posterior_grid.sum()
-    sample_idx = np.where(multinomial(1, posterior_grid.reshape(-1)))[0][0]
-    v0 = v0_grid[int(sample_idx // v1_num_grid)]
-    v1 = v1_grid[int(sample_idx % v1_num_grid)]
-    rho0, rho1 = transform_var_poly(v0, v1, p)
-    return float(rho0), float(rho1), posterior_grid
+    return float(log_norm - 0.5 * (df + d) * np.log1p(quad / df))
 
 
 __all__ = [
-    "HybridObservations",
-    "DSHDPHMMHybridSampler",
-    "transform_var_poly",
+    "GaussianNIWPrior",
+    "HybridEmissionModel",
+    "HybridStateStatistics",
 ]
