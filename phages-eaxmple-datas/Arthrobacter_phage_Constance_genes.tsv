@@ -1,0 +1,65 @@
+gene	start	end	length	strand	gc_content	genetic_code	rbs_motif	marker	evalue	bitscore	uscg	plasmid_hallmark	virus_hallmark	taxid	taxname	annotation_conjscan	annotation_amr	annotation_accessions	annotation_description	phrog	category
+Arthrobacter_phage_Constance_1	52	648	597	1	0.647	11	GGAGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG83	terminase small subunit	83	head and packaging
+Arthrobacter_phage_Constance_2	626	2374	1749	1	0.659	11	AGGA	GENOMAD.127066.VP	5.688e-185	588	0	0	1	1246	Caudoviricetes	NA	NA	PF03354;COG4626	Phage terminase-like protein, large subunit, contains N-terminal HTH domain	2699	head and packaging
+Arthrobacter_phage_Constance_3	2384	3745	1362	1	0.645	11	GGA/GAG/AGG	GENOMAD.058382.VV	1.134e-87	299	0	0	1	7192	Cheoctovirus	NA	NA	TIGR01538	portal protein	104	head and packaging
+Arthrobacter_phage_Constance_4	3745	4986	1242	1	0.676	11	AGGAG	GENOMAD.048768.VV	1.259e-175	552	0	0	1	1246	Caudoviricetes	NA	NA	PF04233;TIGR01641	Phage Mu protein F like protein	1522	head and packaging
+Arthrobacter_phage_Constance_5	5077	5574	498	1	0.639	11	AGGA	GENOMAD.090512.VV	4.13e-12	66	0	0	0	1246	Caudoviricetes	NA	NA	PF14265	head scaffolding protein	4638	head and packaging
+Arthrobacter_phage_Constance_6	5596	6579	984	1	0.664	11	None	GENOMAD.047188.VV	5.065e-170	531	0	0	1	1246	Caudoviricetes	NA	NA	PF05065;TIGR01554;COG4653	phage major capsid protein, HK97 family	10	head and packaging
+Arthrobacter_phage_Constance_7	6590	6970	381	1	0.717	11	AGGAG	GENOMAD.139922.VV	1.196e-69	230	0	0	0	10119	Bridgettevirus bridgette	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_8	7030	7215	186	1	0.613	11	AGGA	GENOMAD.119953.VV	5.229e-31	115	0	0	0	11243	Bridgettevirus	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_9	7215	7805	591	1	0.677	11	GGA/GAG/AGG	GENOMAD.113156.VV	1.039e-35	136	0	0	1	1246	Caudoviricetes	NA	NA	PF09355;TIGR02215	Phage protein Gp19/Gp15/Gp42	442	connector
+Arthrobacter_phage_Constance_10	7802	8200	399	1	0.639	11	4Base/6BMM	GENOMAD.047517.VV	1.907e-59	201	0	0	0	1246	Caudoviricetes	NA	NA	PF19586	hypothetical protein	13779	unknown function
+Arthrobacter_phage_Constance_11	8197	8580	384	1	0.630	11	AGGAG	GENOMAD.065013.VV	1.406e-76	250	0	0	1	1246	Caudoviricetes	NA	NA	TIGR01725	phage protein, HK97 gp10 family	19109	unknown function
+Arthrobacter_phage_Constance_12	8577	8990	414	1	0.623	11	GGA/GAG/AGG	GENOMAD.149680.VV	4.25e-86	278	0	0	0	1246	Caudoviricetes	NA	NA	PHROG29048	hypothetical protein	29048	unknown function
+Arthrobacter_phage_Constance_13	9037	9222	186	1	0.554	11	AGGAG	GENOMAD.157074.VV	3.074e-36	130	0	0	0	1246	Caudoviricetes	NA	NA	PHROG29338	hypothetical protein	29338	unknown function
+Arthrobacter_phage_Constance_14	9215	9730	516	1	0.638	11	GGAG/GAGG	GENOMAD.054683.VV	7.74e-28	112	0	0	0	1246	Caudoviricetes	NA	NA	PHROG2491	major tail protein	2491	tail
+Arthrobacter_phage_Constance_15	9820	10356	537	1	0.616	11	AGGAG	GENOMAD.062024.VV	1.964e-18	85	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_16	10500	10712	213	1	0.606	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_17	10698	10886	189	-1	0.683	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_18	10931	14827	3897	1	0.641	11	GGAGG	GENOMAD.005798.VV	1.2e-41	171	0	0	0	1246	Caudoviricetes	NA	NA	PHROG4704	tail length tape measure protein	4704	tail
+Arthrobacter_phage_Constance_19	14827	15654	828	1	0.669	11	GGAGG	GENOMAD.079823.VV	5.613e-143	450	0	0	0	1246	Caudoviricetes	NA	NA	PHROG14138	minor tail protein	14138	tail
+Arthrobacter_phage_Constance_20	15667	16968	1302	1	0.656	11	AGGAG	GENOMAD.040060.VV	6.132e-212	658	0	0	1	1246	Caudoviricetes	NA	NA	PF06605;COG4379	Prophage endopeptidase tail	1887	tail
+Arthrobacter_phage_Constance_21	16977	17933	957	1	0.680	11	AGGAG	GENOMAD.097276.VV	2.91e-29	122	0	0	0	1246	Caudoviricetes	NA	NA	PHROG16436	hypothetical protein	16436	unknown function
+Arthrobacter_phage_Constance_22	17933	18592	660	1	0.661	11	GGA/GAG/AGG	GENOMAD.107133.VV	4.215e-84	277	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_23	18607	18885	279	1	0.624	11	AGGA	GENOMAD.177602.VV	5.669e-45	157	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_24	18878	19768	891	1	0.654	11	GGAGG	GENOMAD.121557.VV	7.806e-17	84	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_25	19765	20766	1002	1	0.663	11	GGAG/GAGG	GENOMAD.182836.VP	8.362e-06	50	0	0	0	1246	Caudoviricetes	NA	NA	PF01510;COG3023	N-acetyl-anhydromuramyl-L-alanine amidase AmpD	12609	lysis
+Arthrobacter_phage_Constance_26	20769	21041	273	1	0.703	11	GGA/GAG/AGG	GENOMAD.182945.VP	4.108e-24	97	0	0	0	1246	Caudoviricetes	NA	NA	PHROG4316	hypothetical protein	4316	unknown function
+Arthrobacter_phage_Constance_27	21051	21356	306	1	0.680	11	AGGAG	GENOMAD.140031.VV	8.686e-61	203	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_28	21353	21727	375	1	0.669	11	AGGAG	GENOMAD.062248.VV	1.058e-12	66	0	0	0	1246	Caudoviricetes	NA	NA	PHROG17931	tail protein	17931	tail
+Arthrobacter_phage_Constance_29	21731	21943	213	1	0.582	11	GGAG/GAGG	GENOMAD.134536.VV	3.191e-40	142	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_30	21943	23196	1254	1	0.665	11	GGAG/GAGG	GENOMAD.015998.VV	4.612e-13	74	0	0	0	1246	Caudoviricetes	NA	NA	PF18454	Major tropism determinant N-terminal domain	697	head and packaging
+Arthrobacter_phage_Constance_31	23193	23393	201	-1	0.652	11	GGA/GAG/AGG	GENOMAD.185508.VV	6.455e-39	138	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_32	23390	23986	597	-1	0.608	11	GGA/GAG/AGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_33	24177	24686	510	-1	0.553	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG18591	hypothetical protein	18591	unknown function
+Arthrobacter_phage_Constance_34	24866	25786	921	1	0.702	11	GGAG/GAGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG1	integrase	1	integration and excision
+Arthrobacter_phage_Constance_35	25797	26153	357	1	0.683	11	None	GENOMAD.225858.VP	1.207e-65	218	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_36	26415	26621	207	1	0.657	11	GGA/GAG/AGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_37	26814	27956	1143	1	0.656	11	GGxGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG1	integrase	1	integration and excision
+Arthrobacter_phage_Constance_38	28037	28327	291	-1	0.622	11	AGGA/GGAG/GAGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_39	28673	28921	249	-1	0.582	11	AGxAGG/AGGxGG	GENOMAD.096294.VV	2.95e-09	54	0	0	0	11243	Bridgettevirus	NA	NA	PF20075;TIGR02612;COG5606;K22300	mobile mystery protein A	1373	transcription regulation
+Arthrobacter_phage_Constance_40	29071	29325	255	1	0.655	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG4583	transcriptional repressor	4583	transcription regulation
+Arthrobacter_phage_Constance_41	29328	29555	228	1	0.601	11	AGGA/GGAG/GAGG	GENOMAD.175271.VV	7.685e-34	124	0	0	0	1246	Caudoviricetes	NA	NA	PF06806;COG3311;TIGR01764	Predicted DNA-binding transcriptional regulator AlpA	No_PHROG	unknown function
+Arthrobacter_phage_Constance_42	29642	30010	369	1	0.678	11	AGGAG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_43	30007	30303	297	1	0.599	11	AGGA	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_44	30303	30689	387	1	0.649	11	AGGA	GENOMAD.071921.VV	1.949e-06	48	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_45	30686	31492	807	1	0.663	11	GGA/GAG/AGG	GENOMAD.025503.VV	5.225e-37	143	0	0	0	1246	Caudoviricetes	NA	NA	PF12705;TIGR00372;COG1468;K07465	CRISPR-associated protein Cas4	1674	DNA, RNA and nucleotide metabolism
+Arthrobacter_phage_Constance_46	31516	32430	915	1	0.686	11	AGGAG/GGAGG	GENOMAD.060263.VV	3.397e-62	218	0	0	0	11243	Bridgettevirus	NA	NA	PHROG1911	hypothetical protein	1911	unknown function
+Arthrobacter_phage_Constance_47	32504	32812	309	1	0.650	11	AGGA	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_48	32973	33323	351	1	0.644	11	GGA/GAG/AGG	GENOMAD.219476.VV	1.611e-21	91	0	0	0	1246	Caudoviricetes	NA	NA	K03554	hypothetical protein	204	unknown function
+Arthrobacter_phage_Constance_49	33323	34138	816	1	0.664	11	AGxAG	GENOMAD.220200.VV	6.408e-68	233	0	0	0	1246	Caudoviricetes	NA	NA	PF10065;COG5532	Uncharacterized conserved protein (DUF2303)	210	unknown function
+Arthrobacter_phage_Constance_50	34327	34713	387	1	0.661	11	AGGAG	GENOMAD.227750.VP	4.407e-73	240	0	0	0	11243	Bridgettevirus	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_51	34710	35807	1098	1	0.671	11	GGAG/GAGG	GENOMAD.219171.VP	4.847e-52	191	0	0	0	1246	Caudoviricetes	NA	NA	PF11242;TIGR00721;COG3415	DNA-binding protein, Tfx family	1590	unknown function
+Arthrobacter_phage_Constance_52	35804	36220	417	1	0.671	11	AGGA	GENOMAD.163846.VV	3.881e-71	235	0	0	0	11243	Bridgettevirus	NA	NA	TIGR01905	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_53	36217	36507	291	1	0.653	11	GGA/GAG/AGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_54	36504	36785	282	1	0.656	11	GGAGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_55	36782	36919	138	1	0.645	11	AGGA/GGAG/GAGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_56	36916	37140	225	1	0.644	11	GGAG/GAGG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_57	37290	39803	2514	1	0.673	11	AGGA	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG2478	DNA polymerase/primase	2478	DNA, RNA and nucleotide metabolism
+Arthrobacter_phage_Constance_58	40141	40581	441	1	0.658	11	GGA/GAG/AGG	GENOMAD.205009.VV	1.09e-88	286	0	0	0	11243	Bridgettevirus	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_59	40562	40960	399	1	0.632	11	AGGAG	GENOMAD.102324.VV	1.268e-55	190	0	0	0	1246	Caudoviricetes	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_60	40957	41358	402	1	0.639	11	GGA/GAG/AGG	GENOMAD.011790.VV	8.01e-53	182	0	0	0	1246	Caudoviricetes	NA	NA	PF09903;COG1591	Holliday junction resolvase, archaeal type	244	DNA, RNA and nucleotide metabolism
+Arthrobacter_phage_Constance_61	41355	41633	279	1	0.595	11	AGxAGG/AGGxGG	GENOMAD.153198.VP	1.006e-23	96	0	0	1	1246	Caudoviricetes	NA	NA	PF14083;K18948;COG0358;TIGR01391	PGDYG protein	419	unknown function
+Arthrobacter_phage_Constance_62	41630	41827	198	1	0.611	11	GGAG/GAGG	GENOMAD.171098.VV	5.758e-32	118	0	0	0	11243	Bridgettevirus	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_63	41824	42513	690	1	0.658	11	GGAG/GAGG	GENOMAD.202895.VV	1.768e-158	492	0	0	0	11243	Bridgettevirus	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
+Arthrobacter_phage_Constance_64	43110	43292	183	1	0.612	11	AGGAG	NA	NA	NA	0	0	0	1	NA	NA	NA	NA	hypothetical protein	No_PHROG	unknown function
