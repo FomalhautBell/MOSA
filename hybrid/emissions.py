@@ -3,13 +3,35 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import scipy.special as ssp
 
 
 ArrayLike = Sequence[float]
+
+
+def _unpack_observation(
+    observation: Union[
+        Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+        Tuple[Optional[np.ndarray], Optional[Sequence[int]], Optional[Tuple[int, int]]],
+    ]
+) -> Tuple[
+    Optional[np.ndarray],
+    Optional[Sequence[int]],
+    Optional[Tuple[int, int]],
+]:
+    """Return observation components allowing legacy (cont, cats) tuples."""
+
+    if len(observation) == 2:
+        cont, cats = observation
+        beta_counts = None
+    elif len(observation) == 3:
+        cont, cats, beta_counts = observation
+    else:
+        raise ValueError("Observation must contain 2 or 3 elements")
+    return cont, cats, beta_counts
 
 
 def _ensure_array(name: str, value: Optional[np.ndarray]) -> np.ndarray:
@@ -48,6 +70,19 @@ class GaussianNIWPrior:
         return cls(mu0=mu0_arr, kappa0=float(kappa0), nu0=float(nu0), psi0=psi0_arr)
 
 
+@dataclass
+class BetaBinomialPrior:
+    """Beta prior for the Beta-Binomial emission component."""
+
+    alpha0: float
+    beta0: float
+
+    def __post_init__(self) -> None:
+        if self.alpha0 <= 0 or self.beta0 <= 0:
+            raise ValueError("Beta prior parameters must be strictly positive")
+
+
+
 class HybridStateStatistics:
     """Sufficient statistics for a single hidden state."""
 
@@ -64,11 +99,22 @@ class HybridStateStatistics:
         self.cat_counts: List[np.ndarray] = [
             np.zeros_like(prior, dtype=float) for prior in emission_model.categorical_priors
         ]
+        if emission_model.has_beta_binomial:
+            self.successes = 0.0
+            self.trials = 0.0
+        else:
+            self.successes = 0.0
+            self.trials = 0.0
+
 
     def add_observation(
-        self, observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]]
+        self,
+        observation: Union[
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]], Optional[Tuple[int, int]]],
+        ],
     ) -> None:
-        cont, cats = observation
+        cont, cats, beta_counts = _unpack_observation(observation)
         if cont is not None:
             cont = np.asarray(cont, dtype=float)
             self.sum_cont += cont
@@ -76,12 +122,20 @@ class HybridStateStatistics:
         if cats is not None:
             for idx, cat in enumerate(cats):
                 self.cat_counts[idx][cat] += 1.0
+        if beta_counts is not None:
+            succ, trials = beta_counts
+            self.successes += float(succ)
+            self.trials += float(trials)
         self.count += 1
 
     def remove_observation(
-        self, observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]]
+        self,
+        observation: Union[
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]], Optional[Tuple[int, int]]],
+        ],
     ) -> None:
-        cont, cats = observation
+        cont, cats, beta_counts = _unpack_observation(observation)
         if cont is not None:
             cont = np.asarray(cont, dtype=float)
             self.sum_cont -= cont
@@ -89,11 +143,18 @@ class HybridStateStatistics:
         if cats is not None:
             for idx, cat in enumerate(cats):
                 self.cat_counts[idx][cat] -= 1.0
+        if beta_counts is not None:
+            succ, trials = beta_counts
+            self.successes -= float(succ)
+            self.trials -= float(trials)
         self.count -= 1
 
     def predictive_log_prob(
         self,
-        observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+        observation: Union[
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]], Optional[Tuple[int, int]]],
+        ],
     ) -> float:
         return self._model.predictive_log_prob(self, observation)
 
@@ -105,6 +166,7 @@ class HybridEmissionModel:
         self,
         gaussian_prior: Optional[GaussianNIWPrior] = None,
         categorical_priors: Optional[Iterable[ArrayLike]] = None,
+        beta_binomial_prior: Optional[BetaBinomialPrior] = None,
     ) -> None:
         self.gaussian_prior = gaussian_prior
         self.categorical_priors: List[np.ndarray] = [
@@ -115,6 +177,7 @@ class HybridEmissionModel:
                 raise ValueError("Categorical priors must be one-dimensional vectors")
             if np.any(prior <= 0):
                 raise ValueError("Categorical priors must have strictly positive entries")
+        self.beta_binomial_prior = beta_binomial_prior
 
     @property
     def has_continuous(self) -> bool:
@@ -132,9 +195,12 @@ class HybridEmissionModel:
     def predictive_log_prob(
         self,
         state: HybridStateStatistics,
-        observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+        observation: Union[
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]], Optional[Tuple[int, int]]],
+        ],
     ) -> float:
-        cont, cats = observation
+        cont, cats, beta_counts = _unpack_observation(observation)
         log_prob = 0.0
         if self.has_continuous:
             if cont is None:
@@ -144,13 +210,26 @@ class HybridEmissionModel:
             raise ValueError("Categorical observation expected but not provided")
         if self.categorical_priors:
             log_prob += self._categorical_log_predictive(state, cats)
+        if self.has_beta_binomial:
+            if beta_counts is None:
+                raise ValueError("Beta-Binomial observation expected but not provided")
+            log_prob += self._beta_binomial_log_predictive(state, beta_counts)
         return float(log_prob)
 
     def predictive_log_prob_new(
-        self, observation: Tuple[Optional[np.ndarray], Optional[Sequence[int]]]
+        self,
+        observation: Union[
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]]],
+            Tuple[Optional[np.ndarray], Optional[Sequence[int]], Optional[Tuple[int, int]]],
+        ],
     ) -> float:
         temp_state = self.create_state()
         return self.predictive_log_prob(temp_state, observation)
+
+    @property
+    def has_beta_binomial(self) -> bool:
+        return self.beta_binomial_prior is not None
+
 
     def _gaussian_log_predictive(
         self, state: HybridStateStatistics, cont: np.ndarray
@@ -192,6 +271,33 @@ class HybridEmissionModel:
         return log_prob
 
 
+    def _beta_binomial_log_predictive(
+        self, state: HybridStateStatistics, beta_counts: Tuple[int, int]
+    ) -> float:
+        prior = self.beta_binomial_prior
+        if prior is None:
+            raise ValueError("Beta-Binomial prior not configured")
+        successes, trials = beta_counts
+        if trials < 0 or successes < 0 or successes > trials:
+            raise ValueError("Invalid Beta-Binomial observation counts")
+        alpha_post = prior.alpha0 + state.successes
+        beta_post = prior.beta0 + state.trials - state.successes
+        log_coeff = (
+            ssp.gammaln(trials + 1)
+            - ssp.gammaln(successes + 1)
+            - ssp.gammaln(trials - successes + 1)
+        )
+        return float(
+            log_coeff
+            + ssp.gammaln(alpha_post + successes)
+            + ssp.gammaln(beta_post + trials - successes)
+            - ssp.gammaln(alpha_post + beta_post + trials)
+            + ssp.gammaln(alpha_post + beta_post)
+            - ssp.gammaln(alpha_post)
+            - ssp.gammaln(beta_post)
+        )
+
+
 def _multivariate_student_t_logpdf(
     x: np.ndarray, mu: np.ndarray, sigma: np.ndarray, df: float
 ) -> float:
@@ -214,6 +320,7 @@ def _multivariate_student_t_logpdf(
 
 __all__ = [
     "GaussianNIWPrior",
+    "BetaBinomialPrior",
     "HybridEmissionModel",
     "HybridStateStatistics",
 ]

@@ -28,6 +28,7 @@ class HybridObservations:
 
     continuous: Optional[np.ndarray]
     categorical: Optional[Sequence[np.ndarray]]
+    beta_counts: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
         if self.continuous is None and not self.categorical:
@@ -45,16 +46,30 @@ class HybridObservations:
                 lengths.append(int(len(cat_arr)))
                 processed.append(cat_arr)
             self.categorical = processed
+        if self.beta_counts is not None:
+            counts_arr = np.asarray(self.beta_counts, dtype=int)
+            if counts_arr.ndim != 2 or counts_arr.shape[1] != 2:
+                raise ValueError("beta_counts must be a (T, 2) array of successes and trials")
+            lengths.append(int(counts_arr.shape[0]))
+            self.beta_counts = counts_arr
         if len(set(lengths)) != 1:
-            raise ValueError("Continuous and categorical observations must share the same length")
+            raise ValueError(
+                "Continuous, categorical, and beta counts observations must share the same length"
+            )
         self.length = lengths[0]
 
-    def get(self, index: int) -> Tuple[Optional[np.ndarray], Optional[List[int]]]:
+    def get(
+        self, index: int
+    ) -> Tuple[Optional[np.ndarray], Optional[List[int]], Optional[Tuple[int, int]]]:
         cont = None if self.continuous is None else self.continuous[index]
         cats = None
         if self.categorical:
             cats = [int(arr[index]) for arr in self.categorical]
-        return cont, cats
+        beta_counts = None
+        if self.beta_counts is not None:
+            succ, trials = self.beta_counts[index]
+            beta_counts = (int(succ), int(trials))
+        return cont, cats, beta_counts
 
 
 class DSHDPHMMHybridSampler:
