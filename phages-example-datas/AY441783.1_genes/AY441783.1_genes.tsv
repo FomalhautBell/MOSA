@@ -1,0 +1,27 @@
+gene	start	end	length	strand	gc_content	genetic_code	rbs_motif	marker	evalue	bitscore	uscg	plasmid_hallmark	virus_hallmark	taxid	taxname	annotation_conjscan	annotation_amr	annotation_accessions	annotation_description	phrog	category
+AY441783.1_1	236	1015	780	1	0.454	11	AGxAGG/AGGxGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15886	hypothetical protein	15886	unknown function
+AY441783.1_2	1019	2680	1662	1	0.423	11	AGxAGG/AGGxGG	GENOMAD.147210.VP	1.746e-12	73	0	0	0	15675	Tectiviridae	NA	NA	PF03175;K21237;COG0417	DNA polymerase type B, organellar and viral	1907	DNA, RNA and nucleotide metabolism
+AY441783.1_3	2682	3131	450	1	0.442	11	AGGA	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG2860	endolysin	2860	head and packaging
+AY441783.1_4	3131	4906	1776	1	0.481	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG16118	hypothetical protein	16118	unknown function
+AY441783.1_5	4910	5290	381	1	0.467	11	GGA/GAG/AGG	GENOMAD.189157.VV	3.242e-67	223	0	0	1	15349	Alphatectivirus	NA	NA	PF08948	Bacteriophage PRD1, P5, spike N-terminal	15879	unknown function
+AY441783.1_6	5290	6312	1023	1	0.483	11	GGA/GAG/AGG	GENOMAD.189157.VV	4.945e-07	54	0	0	1	15349	Alphatectivirus	NA	NA	PF08948	Bacteriophage PRD1, P5, spike N-terminal	15674	head and packaging
+AY441783.1_7	6331	6591	261	1	0.456	11	GGA/GAG/AGG	GENOMAD.221348.VC	4.609e-52	177	0	0	0	15349	Alphatectivirus	NA	NA	PHROG15795	hypothetical protein	15795	unknown function
+AY441783.1_8	6581	6787	207	1	0.498	11	GGA/GAG/AGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG14809	hypothetical protein	14809	unknown function
+AY441783.1_9	6787	7287	501	1	0.569	11	GGxGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15059	minor head protein	15059	head and packaging
+AY441783.1_10	7320	7643	324	1	0.519	11	None	GENOMAD.166033.VV	1.741e-64	214	0	0	0	15349	Alphatectivirus	NA	NA	PHROG14814	hypothetical protein	14814	unknown function
+AY441783.1_11	7640	8323	684	1	0.443	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG2666	terminase large subunit	2666	head and packaging
+AY441783.1_12	8335	8463	129	1	0.457	11	AGGA	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15703	hypothetical protein	15703	unknown function
+AY441783.1_13	8463	8591	129	1	0.434	11	AGGA	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG16195	hypothetical protein	16195	unknown function
+AY441783.1_14	8598	9785	1188	1	0.526	11	GGAG/GAGG	GENOMAD.150914.VV	4.317e-124	402	0	0	1	15349	Alphatectivirus	NA	NA	PF09018	P3 major capsid protein	5863	head and packaging
+AY441783.1_15	9804	9947	144	1	0.444	11	AGxAGG/AGGxGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15626	hypothetical protein	15626	unknown function
+AY441783.1_16	10171	10443	273	1	0.429	11	GGAGG	GENOMAD.157786.VV	5.695e-44	154	0	0	0	15675	Tectiviridae	NA	NA	PHROG14462	hypothetical protein	14462	unknown function
+AY441783.1_17	10443	10607	165	1	0.455	11	GGA/GAG/AGG	GENOMAD.135893.VV	3.905e-23	92	0	0	1	15349	Alphatectivirus	NA	NA	PF11087	PRD1 phage membrane DNA delivery	8052	moron, auxiliary metabolic gene and host takeover
+AY441783.1_18	10620	10826	207	1	0.493	11	GGA/GAG/AGG	GENOMAD.135893.VV	1.587e-23	94	0	0	1	15349	Alphatectivirus	NA	NA	PF11087	PRD1 phage membrane DNA delivery	8052	moron, auxiliary metabolic gene and host takeover
+AY441783.1_19	10836	11090	255	1	0.541	11	AGxAGG/AGGxGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15441	minor head protein	15441	head and packaging
+AY441783.1_20	11205	11828	624	1	0.502	11	None	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG16567	hypothetical protein	16567	unknown function
+AY441783.1_21	11839	12192	354	1	0.525	11	GGA/GAG/AGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15637	hypothetical protein	15637	unknown function
+AY441783.1_22	12193	13002	810	1	0.543	11	GGxGG	GENOMAD.196041.VP	0.0008445	43	0	0	0	1	NA	NA	NA	PHROG13449	transglycosylase	13449	other
+AY441783.1_23	12999	13352	354	1	0.517	11	GGA/GAG/AGG	GENOMAD.171048.VP	2.813e-07	50	0	0	1	1246	Caudoviricetes	NA	NA	PF16083;TIGR01594	LydA holin phage, holin superfamily III	785	lysis
+AY441783.1_24	13345	13707	363	1	0.449	11	None	GENOMAD.078941.VV	1.166e-26	106	0	0	0	1246	Caudoviricetes	NA	NA	PF10828;TIGR03495	phage lysis regulatory protein, LysB family	89	lysis
+AY441783.1_25	13863	14147	285	-1	0.484	11	GGA/GAG/AGG	NA	NA	NA	0	0	0	1	NA	NA	NA	PHROG15890	single strand DNA binding protein	15890	DNA, RNA and nucleotide metabolism
+AY441783.1_26	14220	14702	483	-1	0.553	11	GGA/GAG/AGG	GENOMAD.206517.VV	2.408e-95	306	0	0	0	15349	Alphatectivirus	NA	NA	PHROG14847	single strand DNA binding protein	14847	DNA, RNA and nucleotide metabolism

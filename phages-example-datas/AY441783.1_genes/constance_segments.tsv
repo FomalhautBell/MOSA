@@ -1,0 +1,5 @@
+segment_id	contig	state	first_gene	last_gene	orf_count	start_bp	end_bp	span_bp	avg_confidence	dominant_category	macro_class
+1	AY441783.1	0	AY441783.1_1	AY441783.1_3	3	236	3131	2896	0.8156	unknown function	Uncharacterized
+2	AY441783.1	1	AY441783.1_4	AY441783.1_14	11	3131	9785	6655	0.9988	unknown function	Morphogenesis
+3	AY441783.1	0	AY441783.1_15	AY441783.1_16	2	9804	10443	640	0.6633	unknown function	Uncharacterized
+4	AY441783.1	1	AY441783.1_17	AY441783.1_26	10	10443	14702	4260	0.9867	unknown function	Morphogenesis

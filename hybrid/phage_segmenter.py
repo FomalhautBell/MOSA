@@ -98,9 +98,7 @@ DEFAULT_MACRO_MAP: Dict[str, str] = {
     "integration and excision": "Information processing and lifecycle control",
     "transcription regulation": "Information processing and lifecycle control",
     "lysis": "Lytic release",
-    "moron": "Host interaction and auxiliary metabolic functions",
-    "auxiliary metabolic gene": "Host interaction and auxiliary metabolic functions",
-    "host takeover": "Host interaction and auxiliary metabolic functions",
+    "moron, auxiliary metabolic gene and host takeover": "Host interaction and auxiliary metabolic functions",
     "other": "Uncharacterized",
     "unknown function": "Uncharacterized",
 }

@@ -1,0 +1,7 @@
+segment_id	contig	state	first_gene	last_gene	orf_count	start_bp	end_bp	span_bp	avg_confidence	dominant_category	macro_class
+1	GU988610.2	0	GU988610.2_1	GU988610.2_45	45	344	21536	21193	1.0	unknown function	Uncharacterized
+2	GU988610.2	2	GU988610.2_46	GU988610.2_48	3	21997	25137	3141	0.8578	unknown function	Uncharacterized
+3	GU988610.2	1	GU988610.2_49	GU988610.2_81	33	25342	51297	25956	0.9978	tail	Uncharacterized
+4	GU988610.2	0	GU988610.2_82	GU988610.2_87	6	51345	54346	3002	1.0	unknown function	Uncharacterized
+5	GU988610.2	2	GU988610.2_88	GU988610.2_88	1	54384	54617	234	0.0133	unknown function	Uncharacterized
+6	GU988610.2	1	GU988610.2_89	GU988610.2_167	79	55058	92183	37126	0.9998	unknown function	Uncharacterized
