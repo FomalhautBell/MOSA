@@ -9,7 +9,7 @@ import hashlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Optional, Dict, List, Sequence, Tuple
 
 import sys
 
@@ -86,6 +86,83 @@ def parse_args() -> argparse.Namespace:
         "--seed", type=int, default=234338369488123928123758124148124168124258, help="Random seed for reproducibility"
     )
     return parser.parse_args()
+
+
+def _norm_cat(s: str) -> str:
+    return (s or "unknown").strip().lower()
+DEFAULT_MACRO_MAP: Dict[str, str] = {
+    "head and packaging": "Morphogenesis",
+    "connector": "Morphogenesis",
+    "tail": "Morphogenesis",
+    "dna, rna and nucleotide metabolism": "Information processing and lifecycle control",
+    "integration and excision": "Information processing and lifecycle control",
+    "transcription regulation": "Information processing and lifecycle control",
+    "lysis": "Lytic release",
+    "moron": "Host interaction and auxiliary metabolic functions",
+    "auxiliary metabolic gene": "Host interaction and auxiliary metabolic functions",
+    "host takeover": "Host interaction and auxiliary metabolic functions",
+    "other": "Uncharacterized",
+    "unknown function": "Uncharacterized",
+}
+
+
+def phrog_to_macro(cat: str, macro_map: Optional[Dict[str, str]] = None) -> str:
+    macro_map = macro_map or DEFAULT_MACRO_MAP
+    return macro_map.get(_norm_cat(cat), "Uncharacterized")
+
+
+def compute_state_weights(reference: np.ndarray, z_samples: Sequence[np.ndarray]) -> np.ndarray:
+    N = int(reference.size)
+    K = int(reference.max()) + 1 if N else 0
+    weights = np.zeros((N, K), dtype=float)
+    if not z_samples:
+        for i, s in enumerate(reference):
+            weights[i, int(s)] = 1.0
+        return weights
+    for z in z_samples:
+        aligned = align_labels(reference, z)
+        for i, s in enumerate(aligned):
+            if 0 <= s < K:
+                weights[i, int(s)] += 1.0
+    weights /= float(len(z_samples))
+    return weights
+
+
+def compute_module_macros(
+    weights: np.ndarray,
+    phrog_labels: Sequence[str],
+    macro_map: Optional[Dict[str, str]],
+    alpha: float,
+    unchar_penalty: float = 0.5,
+    modules: Optional[List[List[int]]] = None,
+) -> Dict[int, str]:
+    N, K = weights.shape
+    modules = modules or [[k] for k in range(K)]
+    macro_names = [
+        "Morphogenesis",
+        "Information processing and lifecycle control",
+        "Host interaction and auxiliary metabolic functions",
+        "Lytic release",
+        "Uncharacterized",
+    ]
+    macro_to_idx = {name: i for i, name in enumerate(macro_names)}
+    gene_macro_idx = np.array([macro_to_idx[phrog_to_macro(cat, macro_map)] for cat in phrog_labels], dtype=int)
+    state_to_macro: Dict[int, str] = {}
+    for mod in modules:
+        m = weights[:, mod].sum(axis=1) if len(mod) > 1 else weights[:, mod[0]]
+        counts = np.zeros(len(macro_names), dtype=float)
+        np.add.at(counts, gene_macro_idx, m)
+        counts[macro_to_idx["Uncharacterized"]] *= float(unchar_penalty)
+        counts += float(alpha)
+        if counts.sum() > 0:
+            probs = counts / counts.sum()
+        else:
+            probs = counts
+        winner = macro_names[int(np.argmax(probs))]
+        for s in mod:
+            state_to_macro[int(s)] = winner
+
+    return state_to_macro
 
 
 def load_records(path: Path) -> List[Dict[str, str]]:
@@ -317,6 +394,7 @@ def write_segments(path: Path, segments: Sequence[Dict[str, object]]) -> None:
         "span_bp",
         "avg_confidence",
         "dominant_category",
+        "macro_class",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
@@ -361,6 +439,35 @@ def main() -> None:
     final_labels = sampler.zt.copy()
     confidence = compute_confidence(final_labels, history.get("zt", []))
     segments = summarize_segments(records, final_labels, confidence)
+    weights = compute_state_weights(final_labels, history.get("zt", []))
+    phrog_labels_seq = [rec.category for rec in records]
+    modules = None
+    state_to_macro = compute_module_macros(
+        weights=weights,
+        phrog_labels=phrog_labels_seq,
+        macro_map=DEFAULT_MACRO_MAP,
+        alpha=args.alpha,
+        unchar_penalty=0.5,
+        modules=modules,
+    )
+    gene_to_macro_direct = {rec.gene: phrog_to_macro(rec.category, DEFAULT_MACRO_MAP) for rec in records}
+    gene_to_idx = {rec.gene: i for i, rec in enumerate(records)}
+    for seg in segments:
+        if int(seg.get("orf_count", 0)) == 1:
+            g = seg["first_gene"]
+            seg["macro_class"] = gene_to_macro_direct.get(g, "Uncharacterized")
+        else:
+            st = int(seg["state"])
+            seg["macro_class"] = state_to_macro.get(st, "Uncharacterized")
+            i0 = gene_to_idx[seg["first_gene"]]
+            i1 = gene_to_idx[seg["last_gene"]]
+            cat_weights = {}
+            for i in range(i0, i1 + 1):
+                cat = records[i].category
+                w = float(weights[i, st])
+                cat_weights[cat] = cat_weights.get(cat, 0.0) + w
+            if cat_weights:
+                seg["dominant_category"] = max(cat_weights.items(), key=lambda kv: kv[1])[0]
     write_segments(args.output, segments)
 
 
