@@ -28,34 +28,6 @@ from hybrid.emissions import (
 from hybrid.sampler import DSHDPHMMHybridSampler, HybridObservations
 
 
-MACRO_CLASSES = [
-    "Morphogenesis",
-    "Information processing and lifecycle control",
-    "Host interaction and auxiliary metabolic functions",
-    "Lytic release",
-    "Uncharacterized",
-]
-
-PHROG_MACRO_MAPPING = {
-    "head and packaging": "Morphogenesis",
-    "connector": "Morphogenesis",
-    "tail": "Morphogenesis",
-    "dna, rna and nucleotide metabolism": "Information processing and lifecycle control",
-    "integration and excision": "Information processing and lifecycle control",
-    "transcription regulation": "Information processing and lifecycle control",
-    "lysis": "Lytic release",
-    "moron": "Host interaction and auxiliary metabolic functions",
-    "auxiliary metabolic gene": "Host interaction and auxiliary metabolic functions",
-    "host takeover": "Host interaction and auxiliary metabolic functions",
-    "other": "Uncharacterized",
-    "unknown function": "Uncharacterized",
-}
-
-UNCHARACTERIZED_CLASS = "Uncharacterized"
-UNCHARACTERIZED_DISCOUNT = 0.5
-MACRO_LAPLACE_ALPHA = 1.0
-
-
 @dataclass
 class PhageRecord:
     """Container with derived attributes for a single ORF."""
@@ -291,130 +263,10 @@ def compute_confidence(reference: np.ndarray, samples: Sequence[np.ndarray]) -> 
     return tally / total
 
 
-def _normalize_category(label: str) -> str:
-    return (label or "").strip().lower()
-
-
-def map_category_to_macro(label: str) -> str:
-    normalized = _normalize_category(label)
-    return PHROG_MACRO_MAPPING.get(normalized, UNCHARACTERIZED_CLASS)
-
-
-def compute_state_weights(reference: np.ndarray, samples: Sequence[np.ndarray]) -> np.ndarray:
-    reference = np.asarray(reference, dtype=int)
-    processed: List[np.ndarray] = [np.asarray(sample, dtype=int) for sample in samples if sample.size]
-    if not processed:
-        if reference.size == 0:
-            return np.zeros((0, 0), dtype=float)
-        K = int(reference.max()) + 1
-        weights = np.zeros((reference.size, K), dtype=float)
-        for idx, state in enumerate(reference):
-            weights[idx, int(state)] = 1.0
-        return weights
-    max_state = int(reference.max()) if reference.size else -1
-    for sample in processed:
-        if sample.size:
-            max_state = max(max_state, int(sample.max()))
-    K = max_state + 1 if max_state >= 0 else 0
-    weights = np.zeros((reference.size, K), dtype=float)
-    for sample in processed:
-        aligned = align_labels(reference, sample)
-        if aligned.size != reference.size:
-            raise ValueError("Aligned assignments must match the reference length")
-        aligned_max = int(aligned.max()) if aligned.size else -1
-        if aligned_max >= weights.shape[1]:
-            expand = aligned_max - weights.shape[1] + 1
-            weights = np.pad(weights, ((0, 0), (0, expand)), mode="constant")
-        for idx, state in enumerate(aligned):
-            weights[idx, int(state)] += 1.0
-    weights /= float(len(processed))
-    return weights
-
-
-def _build_state_module_lookup(
-    modules: Sequence[Sequence[int]] | None, num_states: int
-) -> Dict[int, List[int]]:
-    lookup: Dict[int, List[int]] = {}
-    if modules:
-        for module in modules:
-            normalized = sorted({int(state) for state in module if state is not None})
-            if not normalized:
-                continue
-            for state in normalized:
-                lookup[state] = normalized
-    for state in range(num_states):
-        lookup.setdefault(state, [state])
-    return lookup
-
-
-def _majority_macro(labels: Sequence[str]) -> str:
-    if not labels:
-        return UNCHARACTERIZED_CLASS
-    counts = Counter(labels)
-    return counts.most_common(1)[0][0]
-
-
-def assign_macro_classes(
-    records: Sequence[PhageRecord],
-    segments: Sequence[Dict[str, object]],
-    boundaries: Sequence[Tuple[int, int]],
-    reference_labels: np.ndarray,
-    samples: Sequence[np.ndarray],
-    modules: Sequence[Sequence[int]] | None = None,
-    alpha: float = MACRO_LAPLACE_ALPHA,
-    uncharacterized_discount: float = UNCHARACTERIZED_DISCOUNT,
-) -> List[str]:
-    if not segments:
-        return []
-    weights = compute_state_weights(reference_labels, samples)
-    gene_macros = [map_category_to_macro(rec.category) for rec in records]
-    if weights.size == 0:
-        return [
-            (gene_macros[start] if end - start == 1 else _majority_macro(gene_macros[start:end]))
-            for start, end in boundaries
-        ]
-    module_lookup = _build_state_module_lookup(modules, weights.shape[1])
-    macro_assignments: List[str] = []
-    for segment, (start, end) in zip(segments, boundaries):
-        if end - start <= 0:
-            macro_assignments.append(UNCHARACTERIZED_CLASS)
-            continue
-        if end - start == 1:
-            macro_assignments.append(gene_macros[start])
-            continue
-        state = int(segment["state"])
-        module_states = [s for s in module_lookup.get(state, [state]) if 0 <= s < weights.shape[1]]
-        if not module_states:
-            macro_assignments.append(_majority_macro(gene_macros[start:end]))
-            continue
-        module_weights = weights[start:end][:, module_states].sum(axis=1)
-        if not np.any(module_weights):
-            macro_assignments.append(_majority_macro(gene_macros[start:end]))
-            continue
-        counts = {macro: 0.0 for macro in MACRO_CLASSES}
-        for offset, mass in enumerate(module_weights):
-            macro_label = gene_macros[start + offset]
-            counts[macro_label] = counts.get(macro_label, 0.0) + float(mass)
-        if counts.get(UNCHARACTERIZED_CLASS, 0.0) > 0.0:
-            counts[UNCHARACTERIZED_CLASS] *= uncharacterized_discount
-        smoothed = {macro: counts.get(macro, 0.0) + alpha for macro in MACRO_CLASSES}
-        total = sum(smoothed.values())
-        if total <= 0:
-            macro_assignments.append(_majority_macro(gene_macros[start:end]))
-            continue
-        macro_assignments.append(max(smoothed.items(), key=lambda kv: kv[1])[0])
-    return macro_assignments
-
-
-def summarize_segments(
-    records: Sequence[PhageRecord],
-    labels: np.ndarray,
-    confidence: np.ndarray,
-) -> Tuple[List[Dict[str, object]], List[Tuple[int, int]]]:
+def summarize_segments(records: Sequence[PhageRecord], labels: np.ndarray, confidence: np.ndarray) -> List[Dict[str, object]]:
     segments: List[Dict[str, object]] = []
-    boundaries: List[Tuple[int, int]] = []
     if not records:
-        return segments, boundaries
+        return segments
     seg_id = 1
     start_idx = 0
     for idx in range(1, len(records) + 1):
@@ -432,7 +284,6 @@ def summarize_segments(
             start_gene = block[0]
             end_gene = block[-1]
             dominant_category = Counter(rec.category for rec in block).most_common(1)[0][0]
-            segment_start = start_idx
             segments.append(
                 {
                     "segment_id": seg_id,
@@ -450,8 +301,7 @@ def summarize_segments(
             )
             seg_id += 1
             start_idx = idx
-            boundaries.append((segment_start, idx))
-    return segments, boundaries
+    return segments
 
 
 def write_segments(path: Path, segments: Sequence[Dict[str, object]]) -> None:
@@ -467,7 +317,6 @@ def write_segments(path: Path, segments: Sequence[Dict[str, object]]) -> None:
         "span_bp",
         "avg_confidence",
         "dominant_category",
-        "macro_class",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
@@ -511,16 +360,7 @@ def main() -> None:
     history = sampler.run(num_iterations=args.iterations, burn_in=args.burn_in)
     final_labels = sampler.zt.copy()
     confidence = compute_confidence(final_labels, history.get("zt", []))
-    segments, boundaries = summarize_segments(records, final_labels, confidence)
-    macro_classes = assign_macro_classes(
-        records,
-        segments,
-        boundaries,
-        final_labels,
-        history.get("zt", []),
-    )
-    for segment, macro in zip(segments, macro_classes):
-        segment["macro_class"] = macro
+    segments = summarize_segments(records, final_labels, confidence)
     write_segments(args.output, segments)
 
 
