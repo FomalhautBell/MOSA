@@ -367,22 +367,35 @@ def prepare_observations(records: Sequence[PhageRecord]) -> HybridObservations:
 
 
 def configure_emission_model(
-    continuous: np.ndarray,
+    continuous: Optional[np.ndarray],
     categorical_arrays: Sequence[np.ndarray],
-    beta_prior: BetaBinomialPrior,
+    beta_prior: Optional[BetaBinomialPrior],
 ) -> HybridEmissionModel:
-    mu0 = continuous.mean(axis=0)
-    centered = continuous - mu0
-    scatter = centered.T @ centered
-    d = continuous.shape[1]
-    psi0 = scatter + np.eye(d) * (1.0 + np.trace(scatter) / max(1, continuous.shape[0]))
-    gaussian_prior = GaussianNIWPrior.from_parameters(
-        mu0=mu0,
-        kappa0=1.0,
-        nu0=d + 2.0,
-        psi0=psi0,
-    )
-    categorical_priors = [np.ones(int(arr.max()) + 1, dtype=float) for arr in categorical_arrays]
+    gaussian_prior: Optional[GaussianNIWPrior] = None
+    if continuous is not None:
+        cont_arr = np.asarray(continuous, dtype=float)
+        if cont_arr.ndim == 1:
+            cont_arr = cont_arr[:, None]
+        if cont_arr.size > 0:
+            mu0 = cont_arr.mean(axis=0)
+            centered = cont_arr - mu0
+            scatter = centered.T @ centered
+            d = cont_arr.shape[1]
+            psi0 = scatter + np.eye(d) * (
+                1.0 + np.trace(scatter) / max(1, cont_arr.shape[0])
+            )
+            gaussian_prior = GaussianNIWPrior.from_parameters(
+                mu0=mu0,
+                kappa0=1.0,
+                nu0=d + 2.0,
+                psi0=psi0,
+            )
+    categorical_priors: List[np.ndarray] = []
+    for arr in categorical_arrays:
+        cat_arr = np.asarray(arr, dtype=int)
+        if cat_arr.size == 0:
+            continue
+        categorical_priors.append(np.ones(int(cat_arr.max()) + 1, dtype=float))
     return HybridEmissionModel(
         gaussian_prior=gaussian_prior,
         categorical_priors=categorical_priors,
@@ -676,9 +689,13 @@ def run_single_sample(
     burn_in: int,
 ) -> RunResult:
     np.random.seed(hash_seed_to_uint32(params.seed))
-    beta_prior = BetaBinomialPrior(alpha0=params.beta_alpha, beta0=params.beta_beta)
+    beta_prior: Optional[BetaBinomialPrior]
+    if observations.beta_counts is not None:
+        beta_prior = BetaBinomialPrior(alpha0=params.beta_alpha, beta0=params.beta_beta)
+    else:
+        beta_prior = None
     emission_model = configure_emission_model(
-        np.asarray(observations.continuous, dtype=float),
+        observations.continuous,
         observations.categorical or [],
         beta_prior,
     )
