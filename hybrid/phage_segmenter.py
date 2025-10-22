@@ -464,6 +464,51 @@ def apply_state_annotations(
             seg.dominant_category = max(cat_weights.items(), key=lambda kv: kv[1])[0]
 
 
+def _comb2(x: np.ndarray) -> np.ndarray:
+    return x * (x - 1) / 2.0
+
+
+def adjusted_rand_index(labels_a: np.ndarray, labels_b: np.ndarray) -> float:
+    if labels_a.shape != labels_b.shape:
+        raise ValueError("Label arrays must have the same shape for ARI computation")
+    n = int(labels_a.size)
+    if n <= 1:
+        return 1.0
+
+    _, inv_a = np.unique(labels_a, return_inverse=True)
+    _, inv_b = np.unique(labels_b, return_inverse=True)
+    contingency = np.zeros((int(inv_a.max()) + 1, int(inv_b.max()) + 1), dtype=np.int64)
+    np.add.at(contingency, (inv_a, inv_b), 1)
+
+    sum_comb_c = float(_comb2(contingency).sum())
+    row_sums = contingency.sum(axis=1)
+    col_sums = contingency.sum(axis=0)
+    sum_comb_row = float(_comb2(row_sums).sum())
+    sum_comb_col = float(_comb2(col_sums).sum())
+
+    total_pairs = float(n * (n - 1) / 2.0)
+    if total_pairs == 0.0:
+        return 1.0
+    expected_index = (sum_comb_row * sum_comb_col) / total_pairs if total_pairs else 0.0
+    max_index = 0.5 * (sum_comb_row + sum_comb_col)
+    denom = max_index - expected_index
+    if denom == 0.0:
+        return 1.0 if sum_comb_c == expected_index else 0.0
+    return float((sum_comb_c - expected_index) / denom)
+
+
+def average_adjusted_rand_index(label_sequences: Sequence[np.ndarray]) -> float:
+    if len(label_sequences) <= 1:
+        return 1.0
+    total = 0.0
+    count = 0
+    for i in range(len(label_sequences)):
+        for j in range(i + 1, len(label_sequences)):
+            total += adjusted_rand_index(label_sequences[i], label_sequences[j])
+            count += 1
+    return float(total / count) if count else 1.0
+
+
 def compute_psm(label_sequences: Sequence[np.ndarray], length: int) -> np.ndarray:
     if not label_sequences:
         raise ValueError("No label sequences provided for PSM computation")
@@ -708,6 +753,7 @@ def main() -> None:
 
     consensus_segments = build_consensus_segments(records, psm, threshold=0.5)
     consensus_mean_conf = apply_psm_confidence(consensus_segments, psm)
+    consensus_ari = average_adjusted_rand_index(label_sequences)
 
     run_paths: List[Path] = []
     for result in run_results:
@@ -724,11 +770,11 @@ def main() -> None:
             print(line)
         log_handle.write(
             f"[Consensus] mosaic_num={len(consensus_segments)} avg_conf={consensus_mean_conf:.4f} "
-            f"path={final_report_path}\n"
+            f"ari={consensus_ari:.3f} path={final_report_path}\n"
         )
     print(
         f"[Consensus] mosaic_num={len(consensus_segments)} avg_conf={consensus_mean_conf:.4f} "
-        f"path={final_report_path}"
+        f"ari={consensus_ari:.3f} path={final_report_path}"
     )
     for path in run_paths:
         try:
