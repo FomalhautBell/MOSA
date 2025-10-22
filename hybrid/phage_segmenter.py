@@ -583,15 +583,26 @@ def write_segments(path: Path, segments: Sequence[SegmentSummary]) -> None:
             writer.writerow(segment.to_dict())
 
 
-def resolve_output_paths(output_target: Path) -> Tuple[Path, Path]:
+def derive_output_names(input_path: Path) -> Tuple[str, str]:
+    stem = input_path.stem
+    if stem.endswith("_genes"):
+        stem = stem[: -len("_genes")]
+    segments_name = f"{stem}_segments.tsv"
+    log_name = f"{stem}_segmentation.log"
+    return segments_name, log_name
+
+
+def resolve_output_paths(input_path: Path, output_target: Path) -> Tuple[Path, Path, Path]:
+    segments_name, log_name = derive_output_names(input_path)
     if output_target.suffix:
         output_dir = output_target.parent
         final_report = output_target
     else:
         output_dir = output_target
-        final_report = output_dir / "consensus_segments.tsv"
+        final_report = output_dir / segments_name
     output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir, final_report
+    log_path = output_dir / log_name
+    return output_dir, final_report, log_path
 
 
 def format_log_line(run: RunResult) -> str:
@@ -667,8 +678,7 @@ def main() -> None:
     records = build_records(rows)
     observations = prepare_observations(records)
 
-    output_dir, final_report_path = resolve_output_paths(args.output)
-    log_path = output_dir / "segmentation.log"
+    output_dir, final_report_path, log_path = resolve_output_paths(args.input, args.output)
 
     base_rng = np.random.default_rng(hash_seed_to_uint32(args.seed))
     run_results: List[RunResult] = []
@@ -694,9 +704,11 @@ def main() -> None:
     consensus_segments = build_consensus_segments(records, psm, threshold=0.5)
     consensus_mean_conf = apply_psm_confidence(consensus_segments, psm)
 
+    run_paths: List[Path] = []
     for result in run_results:
         run_path = output_dir / f"run_{result.index:03d}.tsv"
         write_segments(run_path, result.segments)
+        run_paths.append(run_path)
 
     write_segments(final_report_path, consensus_segments)
 
@@ -713,6 +725,12 @@ def main() -> None:
         f"[Consensus] mosaic_num={len(consensus_segments)} avg_conf={consensus_mean_conf:.4f} "
         f"path={final_report_path}"
     )
+    for path in run_paths:
+        try:
+            path.unlink(missing_ok=True)
+        except AttributeError:
+            if path.exists():
+                path.unlink()
 
 
 if __name__ == "__main__":
