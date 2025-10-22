@@ -702,14 +702,17 @@ def main() -> None:
 
     with log_path.open("w", encoding="utf-8") as log_handle:
         for result in run_results:
-            log_handle.write(format_log_line(result) + "\n")
+            line = format_log_line(result)
+            log_handle.write(line + "\n")
+            print(line)
         log_handle.write(
             f"[Consensus] mosaic_num={len(consensus_segments)} avg_conf={consensus_mean_conf:.4f} "
             f"path={final_report_path}\n"
         )
-
-    print(f"Consensus segmentation written to {final_report_path}")
-    print(f"Detailed run logs available at {log_path}")
+    print(
+        f"[Consensus] mosaic_num={len(consensus_segments)} avg_conf={consensus_mean_conf:.4f} "
+        f"path={final_report_path}"
+    )
 
 
 if __name__ == "__main__":
