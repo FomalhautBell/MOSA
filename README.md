@@ -109,11 +109,3 @@ If you use this code or derive ideas from it in academic work, please cite:
 
 * Zhou, D., Gao, Y., Paninski, L. (2020). *Disentangled sticky hierarchical
   Dirichlet process hidden Markov model*. ECML. [arXiv:2004.03019](https://arxiv.org/abs/2004.03019)
-* Pastalkova, E., Wang, Y., Mizuseki, K., Buzsáki, G. (2015). *Simultaneous
-  extracellular recordings ...* CRCNS.org. DOI: 10.6080/K0KS6PHF28
-* Pastalkova, E., Itskov, V., Amarasingham, A., Buzsáki, G. (2008). *Internally
-  generated cell assembly sequences in the rat hippocampus*. Science,
-  321(5894), 1322–1327.
-* Oh, S.M., Rehg, J.M., Balch, T., Dellaert, F. (2008). *Learning and inferring
-  motion patterns using parametric segmental switching linear dynamic systems*.
-  IJCV, 77(1–3), 103–124.
