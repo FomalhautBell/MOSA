@@ -732,10 +732,9 @@ def main() -> None:
     )
     for path in run_paths:
         try:
-            path.unlink(missing_ok=True)
-        except AttributeError:
-            if path.exists():
-                path.unlink()
+            path.unlink()
+        except FileNotFoundError:
+            continue
 
 
 if __name__ == "__main__":
