@@ -240,6 +240,26 @@ def _load_segments_with_genes(tsv_path: Path) -> List[ModuleSegment]:
     return modules
 
 
+def _resolve_and_load_segments(path_or_dir: Path | str) -> List[ModuleSegment]:
+
+    candidate_path = Path(path_or_dir)
+    if candidate_path.is_file():
+        return _load_segments_with_genes(candidate_path)
+
+    if not candidate_path.exists():
+        raise FileNotFoundError(f"Path {candidate_path} does not exist.")
+
+    seg_candidates = sorted(candidate_path.glob("*_segments.tsv"))
+    seg_candidates.extend(sorted(candidate_path.glob("segments.tsv")))
+
+    if not seg_candidates:
+        raise FileNotFoundError(
+            f"No segments file found in {candidate_path}. Expected '*_segments.tsv' or 'segments.tsv'."
+        )
+
+    return _load_segments_with_genes(seg_candidates[0])
+
+
 def _label_weights(
     tags_a: Sequence[str],
     tags_b: Sequence[str],
@@ -622,7 +642,7 @@ def _plot_heatmaps(
     modules_a: Sequence,
     modules_b: Sequence,
     out_file: Path,
-    colors: tuple[str, str, str] = ("#8EDEB6", "#E7F5FF", "#BA99F5"),
+    colors: tuple[str, str] = ("#FBFEFF", "#7B3CEC"),
     border_color: str = "#BEBEBE",
 ) -> None:
     """Create heatmaps for T and element-wise T ⊙ W with a 3-color gradient and gray borders."""
@@ -706,51 +726,6 @@ def compare_phages_fgw(
     np.random.default_rng(rng_seed)
 
 
-def _resolve_and_load_segments(path_or_dir):
-    p = Path(path_or_dir)
-    if p.is_file():
-        folder = p.parent
-        seg_name = p.name
-        stem = p.stem
-        if stem.endswith("_segments"):
-            base = stem[: -len("_segments")]
-        else:
-            base = stem
-        candidates = [
-            f"{base}_genes.tsv",
-            f"{stem}_genes.tsv",
-            f"{base}_genes.csv",
-            f"{stem}_genes.csv",
-            "genes.tsv",
-            "genes.csv",
-        ]
-        found_gene = None
-        for cand in candidates:
-            if (folder / cand).exists():
-                found_gene = cand
-                break
-        genes_name = found_gene if found_gene is not None else candidates[0]
-        segments_name = seg_name
-        return _load_segments_with_genes(folder, segments_name, genes_name)
-    else:
-        folder = p
-        seg_files = list(folder.glob("*_segments.tsv")) + list(folder.glob("segments.tsv"))
-        if seg_files:
-            seg_path = seg_files[0]
-            stem = seg_path.stem
-            if stem.endswith("_segments"):
-                base = stem[: -len("_segments")]
-            else:
-                base = stem
-            candidates = [
-                f"{base}_genes.tsv",
-                f"{stem}_genes.tsv",
-                "genes.tsv",
-            ]
-            found_gene = next((c for c in candidates if (folder / c).exists()), candidates[0])
-            return _load_segments_with_genes(folder, seg_path.name, found_gene)
-        else:
-            raise FileNotFoundError(f"No segments file found in directory {folder}. Expected '*_segments.tsv' or 'segments.tsv'.")
     modules_a = _resolve_and_load_segments(tsv_a)
     modules_b = _resolve_and_load_segments(tsv_b)
 
