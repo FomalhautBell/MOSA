@@ -594,12 +594,17 @@ def derive_output_names(input_path: Path) -> Tuple[str, str]:
 
 def resolve_output_paths(input_path: Path, output_target: Path) -> Tuple[Path, Path, Path]:
     segments_name, log_name = derive_output_names(input_path)
-    if output_target.suffix:
-        output_dir = output_target.parent
-        final_report = output_target
+    if output_target.exists():
+        treat_as_directory = output_target.is_dir()
     else:
+        treat_as_directory = not output_target.suffix
+
+    if treat_as_directory:
         output_dir = output_target
         final_report = output_dir / segments_name
+    else:
+        output_dir = output_target.parent
+        final_report = output_target
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / log_name
     return output_dir, final_report, log_path
