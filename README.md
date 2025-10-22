@@ -1,4 +1,4 @@
-# MOSA: Mixed Observation Sequence Analysis
+# MOSA: MOdular Segmentation & Alignment Algorithm 
 
 This repository hosts tooling for working with mixed-type temporal signals and
 phage module annotations.  It contains two complementary components:
