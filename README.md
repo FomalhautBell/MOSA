@@ -1,102 +1,119 @@
-## Disentangled Sticky Hierarchical Dirichlet Process Hidden Markov Model
+# MOSA: Mixed Observation Sequence Analysis
 
-This code implements the disentangled sticky HDP-HMM (DS-HDP-HMM) and two baseline models: sticky HDP-HMM (S-HDP-HMM) and HDP-HMM.
+This repository hosts tooling for working with mixed-type temporal signals and
+phage module annotations.  It contains two complementary components:
 
-## Installation
+* **Hybrid DS-HDP-HMM sampler** – a disentangled sticky HDP-HMM implementation
+  capable of handling Gaussian, categorical and beta-count observations through
+  a unified emission model.  The implementation lives in the
+  [`hybrid/`](hybrid) package and exposes the
+  `HybridEmissionModel`, `HybridStateStatistics` and
+  `DSHDPHMMHybridSampler` classes for probabilistic sequence modelling.
+* **Fused Gromov–Wasserstein (FGW) comparison pipeline** – utilities to align
+  and compare phage genome module annotations.  The
+  [`hybrid.fgw_pipeline`](hybrid/fgw_pipeline.py) module builds the cross-module
+  affinity matrix, distance matrices and transport plan used for the FGW
+  alignment.  A thin CLI wrapper is provided in
+  [`hybrid.compare_fgw`](hybrid/compare_fgw.py).
 
-The code is written in Python 3.6. In addition to standard scientific Python libraries (numpy, scipy, matplotlib), the code expects the munkres package. You can install the munkres package using: `conda install -c conda-forge munkres`
+The repository also ships a small collection of annotated example genomes under
+[`phages-example-datas/`](phages-example-datas) that can be used to exercise the
+pipeline.
 
-To download this code, run `git clone https://github.com/zhd96/ds-hdp-hmm.git`
+## Requirements
 
-## Examples
+* Python 3.9 or newer
+* [NumPy](https://numpy.org/)
+* [SciPy](https://scipy.org/)
+* [Matplotlib](https://matplotlib.org/)
+* [POT](https://pythonot.github.io/) (``pip install pot``) for the FGW solver
+* [pytest](https://docs.pytest.org/) for running the automated tests (optional)
 
-There are examples for each model and emission function in the examples folder. We are working on more modulated code.
+A virtual environment is highly recommended:
 
-You can run the example through `nohup python file-name.py command-line-parameters &` in general. See each example file for the specific command line parameters it uses. For examples, the files in examples/ds-hdp-hmm folder are examples for DS-HDP-HMM with the following different observations and samplers:
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install numpy scipy matplotlib pot pytest
+```
 
-| File name | Description |
+## Repository layout
+
+| Path | Description |
 | --- | --- |
-| run_full_bayesian_gibbs_gaussian | Gaussian observation, direct assignment sampler |
-| run_full_bayesian_gibbs_multinomial | multinomial observation, direct assignment sampler |
-| run_full_bayesian_gibbs_poisson | Poisson observation, direct assignment sampler |
-| run_full_bayesian_approx_parallel_gibbs_poisson | Poisson observation, weak-limit sampler in parallel |
-| run_full_bayesian_approx_parallel_gibbs_ar | auto-regressive observation, weak-limit sampler in parallel |
+| `hybrid/` | Hybrid emission DS-HDP-HMM sampler, FGW comparison utilities and the CLI entry point. |
+| `phages-example-datas/` | Example phage module annotations (`*_segments.tsv`) and optional gene annotations (`*_genes.tsv`). |
+| `hybrid/tests/` | Pytest-based regression test that exercises the FGW pipeline end-to-end. |
 
-The files in examples/s-hdp-hmm and examples/hdp-hmm are defined for S-HDP-HMM and HDP-HMM respectively as in the examples/ds-hdp-hmm.
+## Running the FGW comparison pipeline
 
-The file in examples/simulate-data is an example on how to simulate the data presented in the paper.
+The command line interface wraps `compare_phages_fgw` and materialises all
+artefacts (transport plan, affinity matrices, report and plots) in an output
+directory.  A minimal example using the bundled data looks as follows:
 
-diff --git a/README.md b/README.md
-index 2bf32615263a347c4a555cc8b7859476bf8c962f..9e99961631efa026c5ac7a1f1e4c4c0c4391e2cd 100644
---- a/README.md
-+++ b/README.md
-@@ -4,41 +4,51 @@ This code implements the disentangled sticky HDP-HMM (DS-HDP-HMM) and two baseli
+```bash
+python -m hybrid.compare_fgw \
+  --a phages-example-datas/GU988610.2/GU988610.2_segments.tsv \
+  --b phages-example-datas/IMGVR_UViG_2684623197_000002/IMGVR_UViG_2684623197_000002_segments.tsv \
+  --out /tmp/fgw-comparison
+```
 
- ## Installation
+The command produces the following files inside `/tmp/fgw-comparison`:
 
- The code is written in Python 3.6. In addition to standard scientific Python libraries (numpy, scipy, matplotlib), the code expects the munkres package. You can install the munkres package using: `conda install -c conda-forge munkres`
+* `W.npy`, `T.npy`, `D_A.npy`, `D_B.npy` – NumPy arrays describing the feature
+  matrix, optimal transport plan and intra-phage distances.
+* `fgwdistance.json`, `p.json`, `q.json` – JSON summaries of the numerical
+  outputs.
+* `heatmap.png` – a heatmap visualising the affinity matrix and transport plan.
+* `report.json` – a structured report containing coverage statistics, runtime
+  metadata and the candidate offsets explored during matching.
+* `cli_summary.json` – a short JSON blob mirroring the return value of the API.
 
- To download this code, run `git clone https://github.com/zhd96/ds-hdp-hmm.git`
+For programmatic use you can import the API directly:
 
- ## Examples
+```python
+from hybrid.fgw_pipeline import compare_phages_fgw
 
- There are examples for each model and emission function in the examples folder. We are working on more modulated code.
+result = compare_phages_fgw(
+    "phages-example-datas/GU988610.2/GU988610.2_segments.tsv",
+    "phages-example-datas/IMGVR_UViG_2684623197_000002/IMGVR_UViG_2684623197_000002_segments.tsv",
+    "./outputs",
+    method="voting",
+    alpha=0.6,
+    reg=1e-2,
+    max_iter=200,
+    tol=1e-6,
+)
+print(result["fgw_distance"])
+```
 
- You can run the example through `nohup python file-name.py command-line-parameters &` in general. See each example file for the specific command line parameters it uses. For examples, the files in examples/ds-hdp-hmm folder are examples for DS-HDP-HMM with the following different observations and samplers:
+Refer to the function docstrings in
+[`hybrid/fgw_pipeline.py`](hybrid/fgw_pipeline.py) for a detailed description of
+all parameters.
 
-| File name                                       | Description                                                 |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| run_full_bayesian_gibbs_gaussian                | Gaussian observation, direct assignment sampler             |
-| run_full_bayesian_gibbs_multinomial             | multinomial observation, direct assignment sampler          |
-| run_full_bayesian_gibbs_poisson                 | Poisson observation, direct assignment sampler              |
-| run_full_bayesian_approx_parallel_gibbs_poisson | Poisson observation, weak-limit sampler in parallel         |
-| run_full_bayesian_approx_parallel_gibbs_ar      | auto-regressive observation, weak-limit sampler in parallel |
+## Running the tests
 
- The files in examples/s-hdp-hmm and examples/hdp-hmm are defined for S-HDP-HMM and HDP-HMM respectively as in the examples/ds-hdp-hmm.
+After installing the dependencies you can verify the pipeline end-to-end:
 
- The file in examples/simulate-data is an example on how to simulate the data presented in the paper.
+```bash
+pytest hybrid/tests/test_fgw_pipeline.py
+```
 
-### Hybrid observation framework
+The test downloads no external resources; it reuses the data shipped with the
+repository and writes temporary artefacts into a pytest-managed directory.
 
-The `code/hybrid/` package provides an extensible DS-HDP-HMM sampler that can model continuous (Gaussian with Normal-Inverse-Wishart prior) and categorical (Dirichlet-multinomial) features simultaneously. The new sampler exposes:
+## Citations
 
-`HybridEmissionModel` – couples Gaussian and multiple categorical emission components.
+If you use this code or derive ideas from it in academic work, please cite:
 
-`HybridObservations` – wraps aligned continuous and categorical observation streams.
-
-`DSHDPHMMHybridSampler` – runs the direct-assignment Gibbs sampler while managing stickiness and hierarchical priors.
-
-This framework can be used to experiment with mixed-type data (e.g. continuous sensor values paired with multi-class annotations) without modifying the legacy one-dimensional Gaussian or purely multinomial implementations.
-
- ## Data
-
- You can find sample datasets in the data folder. The multinomial and Gaussian data are synthetic datasets. The i01_maze15_2d_data_100ms_sample_trials.npz is a segment of Poisson data in paper<sup>1,2</sup>. The bee_seq_data.npz is the sequence 4-6 data in paper<sup>3</sup> with auto-regressive observations.
-
- ## Reference
-
- If you use this code please cite the paper:
-
- Zhou, D., Gao, Y., Paninski, L. Disentangled sticky hierarchical Dirichlet process hidden Markov model. ECML 2020. https://arxiv.org/abs/2004.03019
-
- ## Data sources
-
- 1. Pastalkova, E., Wang, Y., Mizuseki, K., Buzsaki, G.: Simultaneous extracellular recordings from left and right hippocampal areas ca1 and right entorhinal cortex from a rat performing a left/right alternation task and other behaviors. CRCNS.org (2015). https://doi.org/10.6080/K0KS6PHF28. (https://buzsakilab.nyumc.org/datasets/PastalkovaE/i01/i01_maze15_MS.001/)
- 2. Pastalkova, E., Itskov, V., Amarasingham, A., Buzsaki, G.: Internally generated cell assembly sequences in the rat hippocampus. Science 321(5894), 1322–1327 (2008)
- 3. Oh, S.M., Rehg, J.M., Balch, T., Dellaert, F.: Learning and inferring motion patterns using parametric segmental switching linear dynamic systems. International Journal of Computer Vision 77(1-3), 103–124 (2008) (https://www.cc.gatech.edu/~borg/ijcv_psslds/)
-
-## Data
-
-You can find sample datasets in the data folder. The multinomial and Gaussian data are synthetic datasets. The i01_maze15_2d_data_100ms_sample_trials.npz is a segment of Poisson data in paper<sup>1,2</sup>. The bee_seq_data.npz is the sequence 4-6 data in paper<sup>3</sup> with auto-regressive observations.
-
-## Reference
-
-If you use this code please cite the paper:
-
-Zhou, D., Gao, Y., Paninski, L. Disentangled sticky hierarchical Dirichlet process hidden Markov model. ECML 2020. https://arxiv.org/abs/2004.03019
-
-## Data sources
-
-1. Pastalkova, E., Wang, Y., Mizuseki, K., Buzsaki, G.: Simultaneous extracellular recordings from left and right hippocampal areas ca1 and right entorhinal cortex from a rat performing a left/right alternation task and other behaviors. CRCNS.org (2015). https://doi.org/10.6080/K0KS6PHF28. (https://buzsakilab.nyumc.org/datasets/PastalkovaE/i01/i01_maze15_MS.001/)
-2. Pastalkova, E., Itskov, V., Amarasingham, A., Buzsaki, G.: Internally generated cell assembly sequences in the rat hippocampus. Science 321(5894), 1322–1327 (2008)
-3. Oh, S.M., Rehg, J.M., Balch, T., Dellaert, F.: Learning and inferring motion patterns using parametric segmental switching linear dynamic systems. International Journal of Computer Vision 77(1-3), 103–124 (2008) (https://www.cc.gatech.edu/~borg/ijcv_psslds/)
-
+* Zhou, D., Gao, Y., Paninski, L. (2020). *Disentangled sticky hierarchical
+  Dirichlet process hidden Markov model*. ECML. [arXiv:2004.03019](https://arxiv.org/abs/2004.03019)
+* Pastalkova, E., Wang, Y., Mizuseki, K., Buzsáki, G. (2015). *Simultaneous
+  extracellular recordings ...* CRCNS.org. DOI: 10.6080/K0KS6PHF28
+* Pastalkova, E., Itskov, V., Amarasingham, A., Buzsáki, G. (2008). *Internally
+  generated cell assembly sequences in the rat hippocampus*. Science,
+  321(5894), 1322–1327.
+* Oh, S.M., Rehg, J.M., Balch, T., Dellaert, F. (2008). *Learning and inferring
+  motion patterns using parametric segmental switching linear dynamic systems*.
+  IJCV, 77(1–3), 103–124.
